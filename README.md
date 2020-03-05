@@ -1,2 +1,2 @@
 # learn-training
-学习Python项目。
+学习Python语言的训练项目。
