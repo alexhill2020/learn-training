@@ -4,10 +4,13 @@
 # @File : 将xls批量转换为xlsx.py
 # @Software : PyCharm
 
+import sys
+sys.path.append("..")
 import win32com.client as win32
 import os
 
-from y_folder import get_this_file_parent_folder as get_p_f,select_folder_path as slc_pth
+from a_libs.y_folder import get_this_file_parent_folder as get_p_f,select_folder_path as slc_pth
+
 
 def xls_to_xlsx(path):
     print(f"…………你正在将{path}文件夹中的.xls文件转为.xlsx文件…………")

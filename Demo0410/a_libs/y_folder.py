@@ -16,7 +16,9 @@ def get_this_file_parent_folder(): #此函数是从此文件所在的文件夹�
     list_display = []
     for name in list:
         if '.' not in name:
-            if name != 'venv' and name != 'Tools_diy' and name != 'learn_python':
+            list_dir = ['venv','a_tools_diy','a__learn_python','a_libs','a__py文件备份','work_py_file',]
+            if name not in list_dir:
+            #if name != 'venv' and name != 'y__tools_diy' and name != 'y___learn_python' and name != 'y__libs' and name != :
                 print('     '+str(name))  #逐行打印父目录中的文件和文件夹名称。
                 list_display.append(name)
     current_dirname = input(f'{style_head}请输入你要进入的文件夹的名称：{style_end}')

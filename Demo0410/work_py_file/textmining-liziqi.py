@@ -5,6 +5,8 @@
 # @Software : PyCharm
 
 import sys #导入sys模块，以实现在指定地方结束程序。
+sys.path.append("..")
+import os
 import pandas as pd #导入pandas库以读取excel文件。
 import numpy as np #导入numpy库以将excel中的数据转换为列表。
 import jieba #导入jieba库以进行分词。
@@ -12,9 +14,10 @@ import re #导入re库以利用正则表达式进行文本清理。
 from collections import Counter  #导入collections中的counter库以进行词频统计。
 import textwrap #导入textwrap库以实现长字符串换行输出。
 
+from a_libs.y_folder import get_this_file_parent_folder as get_p_f,select_folder_path as slc_pth
+
 '''
 注意事项：
-    1.函数data_sources()中可选择是否自动导入数据。
     2.函数excel_to_list()中可选择是否自动输入列名。同时此函数会返回两个值，一个是包含导入的excel指定列数据的list列表，一个是包含导入的excel全部数据的dataframe。
     3.函数judge_whether_sort_word_frequency_for_original_corpus()中可选择是否先对原始语料进行排序
     4.函数judge_whether_filter()中可选择是否筛选数据。
@@ -26,23 +29,22 @@ import textwrap #导入textwrap库以实现长字符串换行输出。
     10.函数judge_whether_inspect_cleaned_text()中可选择是否检查清理后的文本。
 '''
 
-def data_sources():
-    excel_file = 'liziqi_total_comments.xlsx'  #如要手动输入文件名，请将这里设为空，否则请直接填文件名。
-    if excel_file == '':
-        excel_file = (input("\033[1;33m注意：要在python中处理excel数据，首先应将excel里要处理的数据转换为list列表。\n     要转换的excel文件后缀名必须为.xlsx，后缀名不用输入，且要转换的excel必须有表头，否则会出错。\033[0m\n请输入要转换的excel文件名：")).strip() + '.xlsx'
-    else:
-        print("\033[5;30;47m…………你选择了自动导入Excel数据…………\033[0m")
-    return excel_file
-def excel_to_list(excel_file):  #定义一个函数，将excel中的某一列转化为list列表。注意，第二个参数必须为数字，是列数。
-    col_name = 'text' #不自动输入要进行数据文本挖掘的列的列名，这里就设为空，否则请输入列名。
-    if col_name == '':
-        col_name = (input("请输入要将数据导入list列表，以进行文本挖掘的此excel中某列的列名：")).strip()
-    else:
-        print(f'\033[5;30;47m…………已自动输入要进行数据文本挖掘的列名”{col_name}“…………\033[0m')
-    comments_text_dataframe = pd.read_excel(excel_file,converters={'id':str})  #读取excel_file所指称的文件，并将此文件第二列的数据存入comments_text变量。此时comments_text是个dataframe。
-    comment_array = np.array(comments_text_dataframe[col_name])  #这一步和下一步是把pandas里的数据转换为列表，这里是先调用一个numpy里的array函数将dataframe里指定列的数转为数组。一行一个数据(子元素)。此时comment_array的类型为数组，dataframe指定列里有多少行，这个数组就包含多少个数据。
-    comment_list = comment_array.tolist()  #这一步是将用array函数调用的数组通过.tolist()方法转化为列表。此时comments_list为列表，列表中每个元素都是一条字符串形式的评论。
-    print(f"\033[5;30;47m…………Excel中{col_name}列的数据已全部导入list列表…………\033[0m")
+def excel_to_list(excel_file,col_name):  #定义一个函数，将excel中的某一列转化为list列表。注意，第二个参数必须为数字，是列数。
+    while True:
+        if excel_file:
+            if col_name:
+                comments_text_dataframe = pd.read_excel(excel_file, converters={
+                    'id': str})  # 读取excel_file所指称的文件，并将此文件第二列的数据存入comments_text变量。此时comments_text是个dataframe。
+                comment_array = np.array(comments_text_dataframe[
+                                             col_name])  # 这一步和下一步是把pandas里的数据转换为列表，这里是先调用一个numpy里的array函数将dataframe里指定列的数转为数组。一行一个数据(子元素)。此时comment_array的类型为数组，dataframe指定列里有多少行，这个数组就包含多少个数据。
+                comment_list = comment_array.tolist()  # 这一步是将用array函数调用的数组通过.tolist()方法转化为列表。此时comments_list为列表，列表中每个元素都是一条字符串形式的评论。
+                print(f"\033[5;30;47m…………Excel中{col_name}列的数据已全部导入list列表…………\033[0m")
+                break
+            else:
+                col_name = (input("请输入要将数据导入list列表，以进行文本挖掘的此excel中某列的列名：")).strip()
+        else:
+            excel_file = (input(
+                "\033[1;33m注意：要在python中处理excel数据，首先应将excel里要处理的数据转换为list列表。\n     要转换的excel文件后缀名必须为.xlsx，后缀名不用输入，且要转换的excel必须有表头，否则会出错。\033[0m\n请输入要转换的excel文件名：")).strip() + '.xlsx'
     return comment_list,comments_text_dataframe,col_name  #返回一个包含指定列数据的列表、一个包含导入的excel全部内容的dataframe、指定列的列名。
 def judge_whether_sort_word_frequency_for_original_corpus(data):  #定义一个函数，判断是否先对原始语料进行排序。
     a = 'n'  #如果不先对原始语料进行排序，这里设为空，否则设为n。
@@ -177,11 +179,18 @@ def show_the_highest_ranked_word(data): #此函数用于直接显示排序最高
 
 if __name__ == "__main__":
 
-    #导入文件以进行处理。
-    excel_file = data_sources()
+    work_dir = get_p_f()  #获取工作数据所在的绝对目录
+
+    path = slc_pth(work_dir)  #自主选择数据所在的目录
+
+    filename = input("请输入你要进行文本挖掘的Excel文件的文件名：")
+
+    excel_file = os.path.join(path,filename)
+
+    col_name = ''
 
     #将excel中要处理的数据转换为列表。
-    comment_list,df,col_name = excel_to_list(excel_file)  #调用一开始定义的excel_to_list函数。注意，此函数会返回两个值，一个是包含导入的excel指定列数据的列表，一个是包含导入的excel全部数据的dataframe，一个是指定列的列名。
+    comment_list,df,col_name = excel_to_list(excel_file,col_name)  #调用一开始定义的excel_to_list函数。注意，此函数会返回两个值，一个是包含导入的excel指定列数据的列表，一个是包含导入的excel全部数据的dataframe，一个是指定列的列名。
 
     #判断是否先对指定列的原始语料进行词频排序，以找出对评论进行筛选的关键词。
     judge_whether_sort_word_frequency_for_original_corpus(comment_list)  #定义一个函数，判断是否先对原始语料进行排序。

@@ -3,6 +3,9 @@
 # @Author : 杨昌军
 # @File : 西瓜视频李子柒爬虫.py
 # @Software : PyCharm
+
+import sys
+sys.path.append("..")
 import requests
 import json
 import xlwt

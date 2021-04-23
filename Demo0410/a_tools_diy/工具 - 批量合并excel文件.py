@@ -4,10 +4,12 @@
 # @File : 合并excel文件.py
 # @Software : PyCharm
 
+import sys
+sys.path.append("..")
 import pandas as pd
 import os
 
-from y_folder import get_this_file_parent_folder as get_p_f,select_folder_path as slc_pth
+from a_libs.y_folder import get_this_file_parent_folder as get_p_f,select_folder_path as slc_pth
 
 def merge_excel_file(file_path,file_list):
     style_head = '\033[5;30;47m'  #
