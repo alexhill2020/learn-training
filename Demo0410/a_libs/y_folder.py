@@ -30,6 +30,23 @@ def get_this_file_parent_folder(): #此函数是从此文件所在的文件夹�
     work_dirname = os.path.join(parent_dirname,current_dirname)
     return work_dirname
 
+def in_or_not_in_file_list(dir_path,input_value,ex_name):
+    file_list = os.listdir(dir_path)  #列出传递进来的dir_path下的所有文件和文件夹。
+    num = -(int(len(ex_name)))  #测量传递进来的后缀名ex_name的长度。
+    txt_list = [] #筛选特定后缀名的文件。
+    for file in file_list:
+        if file[num:] == ex_name:
+            txt_list.append(file)
+    while True:
+        if input_value not in txt_list:
+            print(f"\033[1;46m{dir_path}\033[0m文件夹下{ex_name}文件为：")
+            for file1 in txt_list:
+                print("     "+file1)
+            input_value = ((input(f"你输入的未在以上列表中，请仔细检查后重新输入（区分大小写，不用输入后缀名“{ex_name}”）：")).strip())+ex_name
+        else:
+            break
+    return input_value
+
 def select_folder_path(path):  #此函数是选择文件夹路径。
 
     style_head = '\033[5;30;47m'  #
