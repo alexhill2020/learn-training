@@ -14,7 +14,7 @@ NEWSPIDER_MODULE = 'cqmmgo0815Spider.spiders'
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.73'
+#USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.73'
 #这里是设置UA，反爬措施之一。
 
 # Obey robots.txt rules
@@ -26,8 +26,8 @@ USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 2  #下载延迟时间。
-RANDOMIZE_DOWNLOAD_DELAY=True   #启用后，当从相同的网站获取数据时，Scrapy将会等待一个随机的值，延迟时间为0.5到1.5之间的一个随机值乘以DOWNLOAD_DELAY
+#DOWNLOAD_DELAY = 1  #下载延迟时间。
+#RANDOMIZE_DOWNLOAD_DELAY=True   #启用后，当从相同的网站获取数据时，Scrapy将会等待一个随机的值，延迟时间为0.5到1.5之间的一个随机值乘以DOWNLOAD_DELAY
 # The download delay setting will honor only one of:
 #CONCURRENT_REQUESTS_PER_DOMAIN = 16
 #CONCURRENT_REQUESTS_PER_IP = 16
@@ -42,6 +42,8 @@ RANDOMIZE_DOWNLOAD_DELAY=True   #启用后，当从相同的网站获取数据�
 #DEFAULT_REQUEST_HEADERS = {
 #   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 #   'Accept-Language': 'en',
+#   'cookies':'_DM_SID_=bad83ec19f5b52ef739f9847ff75bfcd; _Z3nY0d4C_=37XgPK9h; M_SMILEY_TIP_HIDE=1; _9755xjdesxxd_=32; __snaker__captcha=1lqyHepQARR7oXGB; gdxidpyhxdE=JoRsPg6SDKX%5CDSV67PdPhyXHKfk5%2Bw%5C6i6Y5xgm2SQoJHuumD243osDL22yCvqNu2%5CVU0NiVvd3OScM5jHQligiAB7EPOh6jz9%5CLVmAyx%2F%2FdS2iEY4%2FUYTBO1Ix79lv%2Bgrl8Z4Wx%2Ff%2FrNEO1mteE0iczASPUAvET%5CeUD87OZYyi0GB7z%3A1625140331690; cuid=rWHGkiEeqBAvC28todkfVs6M54xWGjcS; Hm_lvt_db68a43fedf04ba24c901edd34c74600=1629270021; JSESSIONID=3B7D9830CF7715FD6D0218B592F1DA8C; f9big_cq=cq173; Hm_lvt_368b91c8b5ab4c95de73b2b9b158b9af=1629463077,1629509441,1629509661,1629616177; _DM_S_=d9cae098fc1f4b211b80e2f8dbdfaa13; screen=1351; f39big=ip57; f100big_read=bq133; dayCount=%5B%5D; pm_count=%7B%7D; fr_adv=; 19lou_love_pop_daohang=19loucookie; f9bigsec=u105; fr_adv_last=merry_thread_pc; Hm_lpvt_368b91c8b5ab4c95de73b2b9b158b9af=1629629248; _dm_tagnames=%5B%7B%22k%22%3A%22%E6%83%85%E6%84%9F%E6%9D%82%E8%B0%88%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%A9%9A%E6%81%8B%E6%9D%82%E8%B0%88%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E7%9B%B8%E4%BA%B2%E4%BA%A4%E5%8F%8B%E8%AE%BA%E5%9D%9B%22%2C%22c%22%3A132%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E5%90%8C%E5%9F%8E%E4%BA%A4%E5%8F%8B%22%2C%22c%22%3A132%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E5%A5%B3%E6%80%A7%E6%83%85%E6%84%9F%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E6%83%85%E6%84%9F%E8%AE%BA%E5%9D%9B%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%A9%9A%E5%A7%BB%E6%81%8B%E7%88%B1%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%AE%B6%E5%BA%AD%E5%A9%86%E5%AA%B3%E5%85%B3%E7%B3%BB%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%A5%B3%E7%94%9F%E5%BE%81%E5%8F%8B%22%2C%22c%22%3A37%7D%2C%7B%22k%22%3A%222021%E5%B9%B4%E5%BE%81%E5%A9%9A%E5%A4%A7%E8%B5%9B%22%2C%22c%22%3A3%7D%2C%7B%22k%22%3A%22%E5%8D%95%E8%BA%AB%E6%97%A5%E8%AE%B0%22%2C%22c%22%3A3%7D%2C%7B%22k%22%3A%2290%E5%90%8E%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A33%7D%2C%7B%22k%22%3A%22%E7%94%B7%E7%94%9F%E5%BE%81%E5%8F%8B%22%2C%22c%22%3A10%7D%2C%7B%22k%22%3A%22%E7%9B%B8%E4%BA%B2%E8%AF%9D%E9%A2%98%22%2C%22c%22%3A18%7D%2C%7B%22k%22%3A%22%E5%86%B2%E5%88%BA%E7%9A%84%E5%B0%8F%E9%BC%A0c688%22%2C%22c%22%3A3%7D%2C%7B%22k%22%3A%2280%E5%90%8E%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A7%7D%2C%7B%22k%22%3A%222021%E5%B9%B4%E7%9B%B8%E4%BA%B2%E8%AE%B0%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E7%9B%B8%E4%BA%B2%E6%B4%BB%E5%8A%A8%22%2C%22c%22%3A14%7D%2C%7B%22k%22%3A%22%E6%95%B4%E5%AE%B9%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%8F%8C%E7%9C%BC%E7%9A%AE%22%2C%22c%22%3A2%7D%5D; _dm_userinfo=%7B%22uid%22%3A0%2C%22stage%22%3A%22%22%2C%22city%22%3A%22%E9%87%8D%E5%BA%86%3A%E9%87%8D%E5%BA%86%22%2C%22ip%22%3A%22113.251.43.157%22%2C%22sex%22%3A%221%22%2C%22frontdomain%22%3A%22go.cqmmgo.com%22%2C%22category%22%3A%22%E6%83%85%E6%84%9F%2C%E6%97%B6%E5%B0%9A%22%7D',
+#   'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36 Edg/92.0.902.78'
 #}
 
 # Enable or disable spider middlewares
@@ -62,10 +64,15 @@ RANDOMIZE_DOWNLOAD_DELAY=True   #启用后，当从相同的网站获取数据�
 #    'scrapy.extensions.telnet.TelnetConsole': None,
 #}
 
+#DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
+#SCHEDULER = "scrapy_redis.scheduler.Scheduler"
+#SCHEDULER_PERSIST = True
+
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'cqmmgo0815Spider.pipelines.Cqmmgo0815SpiderPipeline': 300,
+#    'scrapy_redis.pipelines.RedisPipeline': 400,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
