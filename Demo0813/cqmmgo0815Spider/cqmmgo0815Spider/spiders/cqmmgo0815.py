@@ -1,37 +1,23 @@
 
 import scrapy
+from scrapy_redis.spiders import RedisSpider
 
-class Cqmmgo0815Spider(scrapy.Spider):   #继承Spider中的类。
+class Cqmmgo0815Spider(scrapy.Spider):   #继承Spider中的类。 #RedisSpider
     name = 'cqmmgo0815'
     allowed_domains = ['go.cqmmgo.com']
+    #redis_key = 'cqmmgo0815:start_urls'
+
     #start_urls = ['https://go.cqmmgo.com/forum-222-{}.html' .format(page) for page in range(1,501)]
     start_urls = ['https://go.cqmmgo.com/forum-222-1.html']  #爬虫起始页。
 
 
-    def start_requests(self):   #这是重写start_requests，以携带并传递cookies，如果不传递则可以直接在setting中设置。
-
-        #这里是带上cookies，重写此start_requests就是为了携带cookies，否则无需重写。
-        #而且也只有在start_request里写了cookies，才能实现cookies传递，在parse里写的cookies不能传递，传递用meta的cookiejar参数，具体可百度。
-        #cookies会失效，还要研究如何才能自动生成并切换cookies。
-        #下面的temp为从浏览器的Network-->XHR中复制的cookie地址,需要将其变成字典格式。
-        temp = '_DM_SID_=bad83ec19f5b52ef739f9847ff75bfcd; _Z3nY0d4C_=37XgPK9h; M_SMILEY_TIP_HIDE=1; _9755xjdesxxd_=32; __snaker__captcha=1lqyHepQARR7oXGB; gdxidpyhxdE=JoRsPg6SDKX%5CDSV67PdPhyXHKfk5%2Bw%5C6i6Y5xgm2SQoJHuumD243osDL22yCvqNu2%5CVU0NiVvd3OScM5jHQligiAB7EPOh6jz9%5CLVmAyx%2F%2FdS2iEY4%2FUYTBO1Ix79lv%2Bgrl8Z4Wx%2Ff%2FrNEO1mteE0iczASPUAvET%5CeUD87OZYyi0GB7z%3A1625140331690; pm_count=%7B%7D; JSESSIONID=50606A76EB4FF374005F42ECB2588533; f9big_cq=cq178; Hm_lvt_368b91c8b5ab4c95de73b2b9b158b9af=1628937734,1628999947,1629211209,1629268395; _DM_S_=595858f1199f65812eaedbd8520a3d5d; f39big=ip76; dayCount=%5B%5D; fr_adv=; f9bigsec=u105; f9big_read=bq134; screen=1351; f100big_read=bq134; cuid=rWHGkiEeqBAvC28todkfVs6M54xWGjcS; isAddHomeScreen=false; Hm_lvt_db68a43fedf04ba24c901edd34c74600=1629270021; Hm_lpvt_db68a43fedf04ba24c901edd34c74600=1629293981; fr_adv_last=login_entry_dengluye_dl; _dm_userinfo=%7B%22ext%22%3A%22%22%2C%22uid%22%3A%2250287966%22%2C%22stage%22%3A%22%22%2C%22city%22%3A%22%E9%87%8D%E5%BA%86%3A%E9%87%8D%E5%BA%86%22%2C%22ip%22%3A%22113.251.43.167%22%2C%22sex%22%3A%221%22%2C%22frontdomain%22%3A%22go.cqmmgo.com%22%2C%22category%22%3A%22%E6%83%85%E6%84%9F%2C%E6%97%B6%E5%B0%9A%22%7D; Hm_lpvt_368b91c8b5ab4c95de73b2b9b158b9af=1629297928; _dm_tagnames=%5B%7B%22k%22%3A%22%E7%9B%B8%E4%BA%B2%E6%B4%BB%E5%8A%A8%22%2C%22c%22%3A13%7D%2C%7B%22k%22%3A%2290%E5%90%8E%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A27%7D%2C%7B%22k%22%3A%2280%E5%90%8E%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A4%7D%2C%7B%22k%22%3A%22%E6%95%B4%E5%AE%B9%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%8F%8C%E7%9C%BC%E7%9A%AE%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%BE%AE%E6%95%B4%E5%BD%A2%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E7%94%B7%E7%94%9F%E5%BE%81%E5%8F%8B%22%2C%22c%22%3A4%7D%2C%7B%22k%22%3A%22%E7%9B%B8%E4%BA%B2%E8%AF%9D%E9%A2%98%22%2C%22c%22%3A13%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E7%9B%B8%E4%BA%B2%E4%BA%A4%E5%8F%8B%E8%AE%BA%E5%9D%9B%22%2C%22c%22%3A109%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E5%90%8C%E5%9F%8E%E4%BA%A4%E5%8F%8B%22%2C%22c%22%3A109%7D%2C%7B%22k%22%3A%22%E4%B8%BB%E5%9F%8E%E7%9B%B8%E4%BA%B2%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%222021%E5%B9%B4%E5%BE%81%E5%A9%9A%E5%A4%A7%E8%B5%9B%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%8D%9A%E5%A3%AB%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E7%94%B7%E7%94%9F%E8%BA%AB%E9%AB%98170%E4%BB%A5%E4%B8%8B%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%A5%B3%E7%94%9F%E5%BE%81%E5%8F%8B%22%2C%22c%22%3A30%7D%2C%7B%22k%22%3A%22%E7%A6%BB%E5%BC%82%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%86%B2%E5%88%BA%E7%9A%84%E5%B0%8F%E9%BC%A0c688%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%A4%A7%E4%B8%93%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%A5%B3%E7%94%9F%E8%BA%AB%E9%AB%98155%E4%BB%A5%E4%B8%8A%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%BB%BA%E8%AE%AE%22%2C%22c%22%3A2%7D%5D'
-        cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
-
-
-
-        for url in self.start_urls:    #因为上面的start_urls是一个列表，所以这里要遍历，以对每一个url发起请求。
-            yield scrapy.Request(url=url,
-                                 callback=self.parse,
-                                 meta={'cookiejar':1},  #meta={'cookiejar':1}表示传递此函数中构建的cookies。
-                                 cookies=cookies,  #这里必须要带cookies访问，即使此start_url可以不带cookies访问，不然cookies无法传递给下一个函数。
-                                 dont_filter=True) #dont_filter=True表示在调度器中不过滤此地址。
-
-
     def parse(self,response):
 
+        #print(response.url,response.request.headers['User-Agent'])
         #key = response.meta['cookiejar']
         #上面是接收上面传下来的cookies，start_request函数中的'cookiejar':1是给cookies做标记，一个cookie表示一个会话(session)，如果需要经多个会话对某网站进行爬取，可以对cookie做标记1,2,3,4......这样scrapy就维持了多个会话。
         #如果需要做标记的cookies，下面的yield的meat则写'cookiejar'：key，否则写'cookiejar':response.meta['cookiejar']，可参考网页：https://www.zhihu.com/question/54773510。
+
 
         divs = response.xpath('//div[@class="new-data-item"]')  #这里是用xpath获取爬虫起始页里的某些元素。要提取的数据所在的div，这一页总共有37个div。
 
@@ -49,17 +35,20 @@ class Cqmmgo0815Spider(scrapy.Spider):   #继承Spider中的类。
             item['title_url_full'] = title_url_full
             item['publish_time'] = publish_time
 
+            temp = '_DM_SID_=bad83ec19f5b52ef739f9847ff75bfcd; _Z3nY0d4C_=37XgPK9h; M_SMILEY_TIP_HIDE=1; _9755xjdesxxd_=32; __snaker__captcha=1lqyHepQARR7oXGB; gdxidpyhxdE=JoRsPg6SDKX%5CDSV67PdPhyXHKfk5%2Bw%5C6i6Y5xgm2SQoJHuumD243osDL22yCvqNu2%5CVU0NiVvd3OScM5jHQligiAB7EPOh6jz9%5CLVmAyx%2F%2FdS2iEY4%2FUYTBO1Ix79lv%2Bgrl8Z4Wx%2Ff%2FrNEO1mteE0iczASPUAvET%5CeUD87OZYyi0GB7z%3A1625140331690; pm_count=%7B%7D; JSESSIONID=50606A76EB4FF374005F42ECB2588533; f9big_cq=cq178; Hm_lvt_368b91c8b5ab4c95de73b2b9b158b9af=1628937734,1628999947,1629211209,1629268395; _DM_S_=595858f1199f65812eaedbd8520a3d5d; f39big=ip76; dayCount=%5B%5D; fr_adv=; f9bigsec=u105; f9big_read=bq134; screen=1351; f100big_read=bq134; cuid=rWHGkiEeqBAvC28todkfVs6M54xWGjcS; isAddHomeScreen=false; Hm_lvt_db68a43fedf04ba24c901edd34c74600=1629270021; Hm_lpvt_db68a43fedf04ba24c901edd34c74600=1629293981; fr_adv_last=login_entry_dengluye_dl; _dm_userinfo=%7B%22ext%22%3A%22%22%2C%22uid%22%3A%2250287966%22%2C%22stage%22%3A%22%22%2C%22city%22%3A%22%E9%87%8D%E5%BA%86%3A%E9%87%8D%E5%BA%86%22%2C%22ip%22%3A%22113.251.43.167%22%2C%22sex%22%3A%221%22%2C%22frontdomain%22%3A%22go.cqmmgo.com%22%2C%22category%22%3A%22%E6%83%85%E6%84%9F%2C%E6%97%B6%E5%B0%9A%22%7D; Hm_lpvt_368b91c8b5ab4c95de73b2b9b158b9af=1629297928; _dm_tagnames=%5B%7B%22k%22%3A%22%E7%9B%B8%E4%BA%B2%E6%B4%BB%E5%8A%A8%22%2C%22c%22%3A13%7D%2C%7B%22k%22%3A%2290%E5%90%8E%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A27%7D%2C%7B%22k%22%3A%2280%E5%90%8E%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A4%7D%2C%7B%22k%22%3A%22%E6%95%B4%E5%AE%B9%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%8F%8C%E7%9C%BC%E7%9A%AE%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%BE%AE%E6%95%B4%E5%BD%A2%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E7%94%B7%E7%94%9F%E5%BE%81%E5%8F%8B%22%2C%22c%22%3A4%7D%2C%7B%22k%22%3A%22%E7%9B%B8%E4%BA%B2%E8%AF%9D%E9%A2%98%22%2C%22c%22%3A13%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E7%9B%B8%E4%BA%B2%E4%BA%A4%E5%8F%8B%E8%AE%BA%E5%9D%9B%22%2C%22c%22%3A109%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E5%90%8C%E5%9F%8E%E4%BA%A4%E5%8F%8B%22%2C%22c%22%3A109%7D%2C%7B%22k%22%3A%22%E4%B8%BB%E5%9F%8E%E7%9B%B8%E4%BA%B2%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%222021%E5%B9%B4%E5%BE%81%E5%A9%9A%E5%A4%A7%E8%B5%9B%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%8D%9A%E5%A3%AB%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E7%94%B7%E7%94%9F%E8%BA%AB%E9%AB%98170%E4%BB%A5%E4%B8%8B%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%A5%B3%E7%94%9F%E5%BE%81%E5%8F%8B%22%2C%22c%22%3A30%7D%2C%7B%22k%22%3A%22%E7%A6%BB%E5%BC%82%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%86%B2%E5%88%BA%E7%9A%84%E5%B0%8F%E9%BC%A0c688%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%A4%A7%E4%B8%93%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%A5%B3%E7%94%9F%E8%BA%AB%E9%AB%98155%E4%BB%A5%E4%B8%8A%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%BB%BA%E8%AE%AE%22%2C%22c%22%3A2%7D%5D'
+            cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}
+
             #注意，yield是传递，scrapy.Request就是在爬取，因此下面这行语句就是在爬取。
             yield scrapy.Request(url=title_url_full,
-                                 meta={'item':item,'cookiejar':response.meta['cookiejar']},  #'cookiejar':response.meta['cookiejar']，如果启用上面传参数的start_request(self)，则这里必须加到meta中。
+                                 meta={'item':item},  #'cookiejar':response.meta['cookiejar']，如果启用上面传参数的start_request(self)，则这里必须加到meta中。
+                                 cookies=cookies,
                                  callback=self.parse_title,  #callback=self.parse_title是将爬取结果交给下面的函数解析。
-                                 )
+                                 dont_filter=True)
 
             #下面的用于抓取下一页的地址，这就不用在start_url中进行for循环了，因为是下一页地址，因此返回给此parse，逻辑是抓取完此页面再抓取下一页面，不要搞混了。
             next_page_url = 'http:' + response.xpath('//div[@class="page-mod fr"]/a[@class="page-next"]/@href').get()
             if next_page_url:
-                yield scrapy.Request(url=next_page_url, callback=self.parse,
-                                     meta={'cookiejar': response.meta['cookiejar']})
+                yield scrapy.Request(url=next_page_url, callback=self.parse,cookies=cookies,)
 
     def parse_title(self,response):   #此函数解析爬取到的详情页。
 
@@ -120,9 +109,9 @@ class Cqmmgo0815Spider(scrapy.Spider):   #继承Spider中的类。
         item['user_time'] = user_div.xpath('./dl[@class="color9 uinfo clearall"]/dd[@class="color6"]/text()').get()
 
         #print(item)
-        #yield item   #以下为爬取用户页数据，如需继续爬取就将'''注释掉，否则将此yield item注释掉，将'''释放。
+        #yield item   #以下为爬取用户页数据，如需继续爬取就注释掉，否则将此yield item注释掉。
 
-#'''
+
 
         user_id = item['user_id']
 
@@ -151,29 +140,6 @@ class Cqmmgo0815Spider(scrapy.Spider):   #继承Spider中的类。
         #                     meta={'item': item},
         #                     headers=headers,
         #                     cookies=cookies,)
-
-
-    '''
-    def parse_user(self,response):   #此函数用于爬user页面，主要为取性别和城市，但这个页面需登录，为尽可能减少登录的影响，不启动这个。性别可从“关注她/他/Ta”中取，城市基本空着，不取。
-
-        item = response.meta['item']
-
-        item['user_name'] = response.xpath('//div[@id="head-wrap"]/div[@class="user-mod"]/h1[@class="ta-home"]/a/text()').get()
-        item['user_gender'] = response.xpath(
-            '//div[@id="cont-wrap"]/div[@id="main-wrap"]/div[@id="home-wrap"]/div[@class="main-mod"]/div[@class="main-bd"]/table/tr[@class="f12 color6"]/td[@width="115"]/text()').get()
-        item['user_city'] = response.xpath(
-            '//div[@id="cont-wrap"]/div[@id="main-wrap"]/div[@id="home-wrap"]/div[@class="main-mod"]/div[@class="main-bd"]/table/tr/td[@width="275"]/text()').get()
-
-
-        user_id = item['user_id']
-        user_af_num_url = 'https://go.cqmmgo.com/u/ajaxApi/user/otherInfo/getInfo?uid={}'.format(user_id)  # 电脑wap端页面，用于爬取用户关注数和粉丝数。
-        #注意，上面的网址不登录也可以访问，因此不用继续传cookies。
-
-        yield scrapy.Request(url=user_af_num_url,
-                             meta={'item': item},
-                             callback=self.parse_user_af,
-                             )  # dont_filter=True
-    '''
 
     def parse_user_af(self, response):
         response_af = response.json()
@@ -205,5 +171,46 @@ class Cqmmgo0815Spider(scrapy.Spider):   #继承Spider中的类。
 
 #'''
 
+'''
+    def parse_user(self,response):   #此函数用于爬user页面，主要为取性别和城市，但这个页面需登录，为尽可能减少登录的影响，不启动这个。性别可从“关注她/他/Ta”中取，城市基本空着，不取。
 
+        item = response.meta['item']
+
+        item['user_name'] = response.xpath('//div[@id="head-wrap"]/div[@class="user-mod"]/h1[@class="ta-home"]/a/text()').get()
+        item['user_gender'] = response.xpath(
+            '//div[@id="cont-wrap"]/div[@id="main-wrap"]/div[@id="home-wrap"]/div[@class="main-mod"]/div[@class="main-bd"]/table/tr[@class="f12 color6"]/td[@width="115"]/text()').get()
+        item['user_city'] = response.xpath(
+            '//div[@id="cont-wrap"]/div[@id="main-wrap"]/div[@id="home-wrap"]/div[@class="main-mod"]/div[@class="main-bd"]/table/tr/td[@width="275"]/text()').get()
+
+
+        user_id = item['user_id']
+        user_af_num_url = 'https://go.cqmmgo.com/u/ajaxApi/user/otherInfo/getInfo?uid={}'.format(user_id)  # 电脑wap端页面，用于爬取用户关注数和粉丝数。
+        #注意，上面的网址不登录也可以访问，因此不用继续传cookies。
+
+        yield scrapy.Request(url=user_af_num_url,
+                             meta={'item': item},
+                             callback=self.parse_user_af,
+                             )  # dont_filter=True
+'''
+
+
+'''
+    def start_requests(self):   #这是重写start_requests，以携带并传递cookies，如果不传递则可以直接在setting中设置。
+
+        #这里是带上cookies，重写此start_requests就是为了携带cookies，否则无需重写。
+        #而且也只有在start_request里写了cookies，才能实现cookies传递，在parse里写的cookies不能传递，传递用meta的cookiejar参数，具体可百度。
+        #cookies会失效，还要研究如何才能自动生成并切换cookies。
+        #下面的temp为从浏览器的Network-->XHR中复制的cookie地址,需要将其变成字典格式。
+        temp = '_DM_SID_=bad83ec19f5b52ef739f9847ff75bfcd; _Z3nY0d4C_=37XgPK9h; M_SMILEY_TIP_HIDE=1; _9755xjdesxxd_=32; __snaker__captcha=1lqyHepQARR7oXGB; gdxidpyhxdE=JoRsPg6SDKX%5CDSV67PdPhyXHKfk5%2Bw%5C6i6Y5xgm2SQoJHuumD243osDL22yCvqNu2%5CVU0NiVvd3OScM5jHQligiAB7EPOh6jz9%5CLVmAyx%2F%2FdS2iEY4%2FUYTBO1Ix79lv%2Bgrl8Z4Wx%2Ff%2FrNEO1mteE0iczASPUAvET%5CeUD87OZYyi0GB7z%3A1625140331690; pm_count=%7B%7D; JSESSIONID=50606A76EB4FF374005F42ECB2588533; f9big_cq=cq178; Hm_lvt_368b91c8b5ab4c95de73b2b9b158b9af=1628937734,1628999947,1629211209,1629268395; _DM_S_=595858f1199f65812eaedbd8520a3d5d; f39big=ip76; dayCount=%5B%5D; fr_adv=; f9bigsec=u105; f9big_read=bq134; screen=1351; f100big_read=bq134; cuid=rWHGkiEeqBAvC28todkfVs6M54xWGjcS; isAddHomeScreen=false; Hm_lvt_db68a43fedf04ba24c901edd34c74600=1629270021; Hm_lpvt_db68a43fedf04ba24c901edd34c74600=1629293981; fr_adv_last=login_entry_dengluye_dl; _dm_userinfo=%7B%22ext%22%3A%22%22%2C%22uid%22%3A%2250287966%22%2C%22stage%22%3A%22%22%2C%22city%22%3A%22%E9%87%8D%E5%BA%86%3A%E9%87%8D%E5%BA%86%22%2C%22ip%22%3A%22113.251.43.167%22%2C%22sex%22%3A%221%22%2C%22frontdomain%22%3A%22go.cqmmgo.com%22%2C%22category%22%3A%22%E6%83%85%E6%84%9F%2C%E6%97%B6%E5%B0%9A%22%7D; Hm_lpvt_368b91c8b5ab4c95de73b2b9b158b9af=1629297928; _dm_tagnames=%5B%7B%22k%22%3A%22%E7%9B%B8%E4%BA%B2%E6%B4%BB%E5%8A%A8%22%2C%22c%22%3A13%7D%2C%7B%22k%22%3A%2290%E5%90%8E%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A27%7D%2C%7B%22k%22%3A%2280%E5%90%8E%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A4%7D%2C%7B%22k%22%3A%22%E6%95%B4%E5%AE%B9%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%8F%8C%E7%9C%BC%E7%9A%AE%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%BE%AE%E6%95%B4%E5%BD%A2%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E7%94%B7%E7%94%9F%E5%BE%81%E5%8F%8B%22%2C%22c%22%3A4%7D%2C%7B%22k%22%3A%22%E7%9B%B8%E4%BA%B2%E8%AF%9D%E9%A2%98%22%2C%22c%22%3A13%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E7%9B%B8%E4%BA%B2%E4%BA%A4%E5%8F%8B%E8%AE%BA%E5%9D%9B%22%2C%22c%22%3A109%7D%2C%7B%22k%22%3A%22%E9%87%8D%E5%BA%86%E5%90%8C%E5%9F%8E%E4%BA%A4%E5%8F%8B%22%2C%22c%22%3A109%7D%2C%7B%22k%22%3A%22%E4%B8%BB%E5%9F%8E%E7%9B%B8%E4%BA%B2%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%222021%E5%B9%B4%E5%BE%81%E5%A9%9A%E5%A4%A7%E8%B5%9B%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%8D%9A%E5%A3%AB%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E7%94%B7%E7%94%9F%E8%BA%AB%E9%AB%98170%E4%BB%A5%E4%B8%8B%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%A5%B3%E7%94%9F%E5%BE%81%E5%8F%8B%22%2C%22c%22%3A30%7D%2C%7B%22k%22%3A%22%E7%A6%BB%E5%BC%82%E5%BE%81%E5%A9%9A%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%86%B2%E5%88%BA%E7%9A%84%E5%B0%8F%E9%BC%A0c688%22%2C%22c%22%3A2%7D%2C%7B%22k%22%3A%22%E5%A4%A7%E4%B8%93%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%A5%B3%E7%94%9F%E8%BA%AB%E9%AB%98155%E4%BB%A5%E4%B8%8A%22%2C%22c%22%3A1%7D%2C%7B%22k%22%3A%22%E5%BB%BA%E8%AE%AE%22%2C%22c%22%3A2%7D%5D'
+        cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
+
+
+
+        for url in self.start_urls:    #因为上面的start_urls是一个列表，所以这里要遍历，以对每一个url发起请求。
+            yield scrapy.Request(url=url,
+                                 callback=self.parse,
+                                 meta={'cookiejar':1},  #meta={'cookiejar':1}表示传递此函数中构建的cookies。
+                                 cookies=cookies,  #这里必须要带cookies访问，即使此start_url可以不带cookies访问，不然cookies无法传递给下一个函数。
+                                 dont_filter=True) #dont_filter=True表示在调度器中不过滤此地址。
+'''
 

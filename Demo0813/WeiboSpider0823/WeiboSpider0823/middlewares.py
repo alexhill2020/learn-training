@@ -3,61 +3,13 @@
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-import time
 from scrapy import signals
-from selenium import webdriver
-from scrapy.http import HtmlResponse
-import requests
-import random
 
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
 
-from .settings import USER_AGENT_LIST   #这里表示从当前文件夹下的settings.py文件中引入USER_AGENT_LIST列表。
 
-class RandomUserAgent(object):
-
-    def process_request(self,request,spider):
-        ua = random.choice(USER_AGENT_LIST)
-        request.headers['User-Agent'] = ua
-
-'''#利用selenium自动登录模板。
-class LoginMiddle(object):
-    def process_request(self,request,spider):
-        if spider.name=='cqmmgo815':#判断是哪个爬虫名
-            if request.url.find('signup')!=-1:#这里signup是在链接中的signup，-1表示未登陆
-                spider.broswer=webdriver.Chrome()
-                spider.broswer.get(request.url)#获取url，myzhihu中的start_url
-                time.sleep(1)
-                spider.broswer.find_element_by_xpath('//div[@class="SignContainer-switch"]/span').click()
-                time.sleep(1)
-                #获取输入框
-                username=spider.broswer.find_element_by_name('username')#
-                password=spider.broswer.find_element_by_name('password')
-                #传值
-                username.send_keys("188775729")
-                password.send_keys("changeme_123")
-                time.sleep(5)
-                spider.broswer.find_element_by_xpath('//button[@class="Button SignFlow-submitButton Button--primary Button--blue"]').click()
-                time.sleep(2)
-                #获取登录后cookie
-                spider.cookies=spider.broswer.get_cookies()
-                return HtmlResponse(url=spider.broswer.current_url,#当前的url即登录后的url
-                                        body=spider.broswer.page_source,#Gets the source of the current page.
-                                            encoding="utf-8")
-            else:
-                # requests请求登录
-                session=requests.session()#请求session
-                #cookie一个字典
-                for cookie in spider.cookies:
-                    session.cookies.set(cookie['name',cookie['value']])
-                    session.headers.clear()#清除头
-                    newpage=session.get(request.url,verify=False).content.decode()
-                    return HtmlResponse(url=request.url,body=newpage,encoding='urf-8')
-'''
-
-'''
-class Cqmmgo0815SpiderSpiderMiddleware:
+class Weibospider0823SpiderMiddleware:
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the spider middleware does not modify the
     # passed objects.
@@ -104,7 +56,7 @@ class Cqmmgo0815SpiderSpiderMiddleware:
         spider.logger.info('Spider opened: %s' % spider.name)
 
 
-class Cqmmgo0815SpiderDownloaderMiddleware:
+class Weibospider0823DownloaderMiddleware:
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the downloader middleware does not modify the
     # passed objects.
@@ -149,4 +101,3 @@ class Cqmmgo0815SpiderDownloaderMiddleware:
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
-'''
