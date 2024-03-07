@@ -8,7 +8,9 @@
  * Author URI: http://yourwebsite.com
  */
 
-include_once(plugin_dir_path(__FILE__) . 'cos-settings.php');  //引入并执行cos-settings.php文件，以进行COS客户端相关参数设置。
+//引入并执行cos-settings.php、files_display.php等独立文件，以实现COS客户端相关参数设置、文件展示等功能。
+include_once(plugin_dir_path(__FILE__) . 'cos-settings.php');  
+//include_once(plugin_dir_path(__FILE__) . 'files_display.php');
 
 require __DIR__ . '/vendor/autoload.php';  //加载腾讯云对象存储COS的PHP SDK。
 
@@ -53,6 +55,9 @@ function get_cos_client() {
     ]);
     return $cosClient;
 }
+
+
+//--------------以下为文件上传-----------------
 
 
 //此函数主要用正则式法代替basename方法，因为basename方法会让文件名中的中文字符丢失。
@@ -324,79 +329,210 @@ function upload_files_info_to_database($fileName, $fileSize, $uploadTime, $fileU
 
 
 
-//--------以下为检索和查询-----------------
+//--------以下为文件检索-----------------
 
 
+//表单函数。这个没有问题。
 function custom_search_form_shortcode() {
     ob_start();
     
      ?>
-    <form action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" method="post">
+    <form id="custom-search-form" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" method="post">
         <input type="hidden" name="action" value="custom_search">
-        <label for="file_name">文件名:</label>
+        <label for="file_name">文件名称:</label>
         <input type="text" id="file_name" name="file_name"><br>
-        <label for="brand">品牌:</label>
+        <label for="brand">创作品牌:</label>
         <input type="text" id="brand" name="brand"><br>
-        <label for="brand">课程:</label>
+        <label for="brand">课程所属:</label>
         <input type="text" id="course" name="course"><br>
         <!-- 添加更多字段 -->
         <input type="submit" value="检索">
     </form>
-    <?php
+    <div id="search-message"></div>
+    <div id="search-results"></div>
+    <button id="load-more" style="display: none;">更多</button>
+        <?php
     return ob_get_clean();
 }
 add_shortcode('custom_search_form', 'custom_search_form_shortcode');
 
 
-function custom_search() {
-    global $wpdb; // 全局变量，用于数据库操作
+//Ajax函数，以在同页面显示。突然就能用了，不知道怎么回事20240306.15.26。
+function add_custom_script() {
+    ?>
+    <script>
+        let currentPage = 1; // 初始页码
+        const perPage = 10; // 每页记录数，和PHP端保持一致
+        
+        jQuery(document).ready(function($) {
+            // 表单提交事件
+            $('#custom-search-form').submit(function(e) {
+                e.preventDefault();  //阻止表单提交，改用ajax提交。
+                currentPage = 1; // 重置页码
+                loadResults();
+            });
+        
+            // “更多”按钮点击事件
+            $('#load-more').click(function(e) {
+                currentPage++;
+                loadResults();
+            });
+        
+            // 加载结果的函数。
+            function loadResults() {
+                var formData = $('#custom-search-form').serialize() + '&page=' + currentPage; //使用jQuery的 .serialize() 方法来收集表单 #custom-search-form 中所有输入字段的数据，并将其转换成一个用于GET或POST请求的查询字符串格式。然后，它通过拼接字符串的方式，在这个查询字符串的末尾添加了 &page= 和当前页码 currentPage 的值。
+                $.ajax({
+                    type: 'POST',
+                    url: '<?php echo admin_url('admin-post.php'); ?>',  
+                    data: formData,
+                    dataType: 'json', // 指定响应数据的类型为JSON
+                    //下面的success: function(data){}是一个回调函数，当AJAX请求成功完成时被调用。函数的参数data是从服务器返回的数据，根据上面的dataType设置，这里data是一个已经被解析为JavaScript对象的JSON数据。
+                    success: function(response) {    //经证明，改为custom_search函数中的respons不行，必须是data。之前respons里有数据，这里却接收不到，感觉就是这个问题。最终找出了问题，原来success: function(data)中用data则里面的也要用data，如果用response，则里面的也要用response。
+                        // 首次查询清空之前的结果，加载更多时追加结果
+                        //console.log('Marker: 11111111111112345', data); // 打印数据以便调试，在浏览器控制台consol中查看，Marker的值为自己写的标识符，表明确实打印的是这里的结果。
+                        
+                        $('#search-message').text(response.message); // 显示搜索状态消息
+                        
+                        //下面的判断是说如果当前页面为1，则显示第一而，如果当前页面不为1，则在第1页后面附加。
+                        if (currentPage === 1) {
+                            $('#search-results').html(response.html);
+                        } else {
+                            $('#search-results').append(response.html);
+                        }
+                        
+                        // 根据hasMore决定是否显示“更多”按钮。意思是如果data.hasMore的值为True，则显示表单中的load-more按钮，否则隐藏此按钮。
+                        if (response.hasMore) {
+                            $('#load-more').show();
+                        } else {
+                            $('#load-more').hide();
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+    <?php
+}
+add_action('wp_footer', 'add_custom_script'); //钩子，与WordPress的wp_footer运作挂钩。
 
-    // 确保这个函数只处理POST请求
+
+//查询函数。这个没有问题。
+function custom_search() {
+    header('Content-Type: application/json'); // 声明响应类型为JSON
+    global $wpdb; // 全局数据库操作对象
+
     if ('POST' !== $_SERVER['REQUEST_METHOD']) {
-        return;
+        die(); // 如果不是POST请求，终止执行
     }
 
-    // 检查并清理表单字段
+    // 清理和获取POST请求中的数据。要添加查询字段就在这里添加。
     $file_name = isset($_POST['file_name']) ? sanitize_text_field($_POST['file_name']) : '';
     $brand = isset($_POST['brand']) ? sanitize_text_field($_POST['brand']) : '';
     $course = isset($_POST['course']) ? sanitize_text_field($_POST['course']) : '';
-    // 添加其他字段...
 
-    // 构建基础查询语句
-    $query = "SELECT * FROM wp_cos_files_informations WHERE 1=1"; // 注意“wp_cos_files_informations”为表名，一定要跟数据库的表名一模一样。
+    // 构建用于计算总结果数的查询
+    $count_query = "SELECT COUNT(*) FROM wp_cos_files_informations WHERE 1=1";
 
-    // 根据用户输入添加条件
+    // 构建获取实际查询结果的SQL语句
+    $results_query = "SELECT * FROM wp_cos_files_informations WHERE 1=1";
+
+    // 添加查询条件。添加了查询字段后在这里添加查询条件。
     if (!empty($file_name)) {
-        $query .= $wpdb->prepare(" AND file_name LIKE %s", '%'.$file_name.'%');
+        $count_query .= $wpdb->prepare(" AND file_name LIKE %s", '%' . $file_name . '%');
+        $results_query .= $wpdb->prepare(" AND file_name LIKE %s", '%' . $file_name . '%');
     }
     if (!empty($brand)) {
-        $query .= $wpdb->prepare(" AND brand = %s", $brand);
+        $count_query .= $wpdb->prepare(" AND brand = %s", $brand);
+        $results_query .= $wpdb->prepare(" AND brand = %s", $brand);
     }
     if (!empty($course)) {
-        $query .= $wpdb->prepare(" AND course = %s", $course);
+        $count_query .= $wpdb->prepare(" AND course = %s", $course);
+        $results_query .= $wpdb->prepare(" AND course = %s", $course);
     }
-    // 添加其他字段的条件...
 
-    // 执行查询
-    $results = $wpdb->get_results($query);
+    // 获取查询结果总数
+    $total_results = $wpdb->get_var($count_query);
     
-    //error_log('44444444444Executed query: ' . $wpdb->last_query);
-
-    // 检查并显示结果
-    if (!empty($results)) {
-        foreach ($results as $row) {
-            echo '<div>';
-            echo '<p>File Name: ' . esc_html($row->file_name) . '</p>';
-            echo '<p>File Url: ' . esc_html($row->file_url) . '</p>';
-            // 输出其他字段...
-            echo '</div>';
-        }
+    
+    if (!empty($wpdb->last_error)) {
+        // 如果有错误，构建错误消息的响应
+        $response = [
+            'success' => false,
+            'message' => '检索失败，请检查数据库及存储服务器设置，或稍后重试。',
+        ];
     } else {
-        echo '<p>No results found.</p>';
+        // 没有数据库错误，执行获取实际查询结果的查询
+        
+        // 处理分页参数
+        $page = isset($_POST['page']) ? (int)$_POST['page'] : 1;
+        $per_page = 5;
+        $offset = ($page - 1) * $per_page;
+    
+        // 添加分页条件
+        $results_query .= $wpdb->prepare(" LIMIT %d, %d", $offset, $per_page);
+    
+        // 执行获取结果的查询
+        $results = $wpdb->get_results($results_query);
+
+        if (!empty($results)) {
+            // 有结果，构建成功响应的代码
+            
+            // 遍历结果，并将结果按条储存在$htmlContent中（列表），以逐条显示。
+            $htmlContent = ''; //$htmlContent 是一个字符串，它通过拼接HTML内容构建而成。这个字符串里有<div><p>等，直接就是HTML语言的结构。
+            foreach ($results as $row) {
+                
+                // 修改视频URL为缩略图URL
+                $videoUrl = esc_url($row->file_url);
+                $snapshotUrl = str_replace("/videos/", "/videos/slice/", $videoUrl);
+                //$snapshotUrl = preg_replace("/\.mp4$/", ".flv", $snapshotUrl);
+                
+                // 去除文件名后缀
+                $fileName = esc_html($row->file_name);
+                $fileNameWithoutExt = preg_replace("/\.mp4$/", "", $fileName);
+                
+                $htmlContent .= '<div class="search-result-item">';
+                //$htmlContent .= '<p><b>' . esc_html($row->file_name) . '：</b><a href="' . esc_url($row->file_url) . '" target="_blank">点击查看</a></p>';  //要改显示的方式就在这里改。
+                $htmlContent .= '<table style="border: 0; width: 100%; border-collapse: collapse;"><tr><td style="border: 0; text-align: center;"><a href="' . $videoUrl . '" target="_blank"><video controls onmouseover="this.play()" onmouseout="this.pause()"><source src="' . $snapshotUrl . '" type="video/mp4">您的浏览器不支持视频标签。</video></a></td></tr>';
+                $htmlContent .= '<tr><td style="border: 0; text-align: center;"><a href="/video_page.php?videoUrl='. $videoUrl .'" >' . $fileNameWithoutExt . '</a></td></tr></table>';  //videoUrl='. urlencode($videoUrl) .'编码
+                $htmlContent .= '</div>';
+            }
+            
+            if ($total_results < 5){
+                $searchStatusMessage = "检索成功，共检索到 " . $total_results . " 条信息。";
+            } else {
+                $searchStatusMessage = "检索成功，共检索到 " . $total_results . " 条信息。此页只显示前5条，查看更多请点击“更多”按钮。";
+            }   
+
+            // 计算总页数和是否还有更多结果
+            $total_pages = ceil($total_results / $per_page);
+            $hasMore = $page < $total_pages;
+        
+            // 构建响应数组
+            $response = [
+                'html' => $htmlContent,
+                'hasMore' => $hasMore,
+                'resultCount' => $total_results, // 添加返回结果总数
+                'message' => $searchStatusMessage,
+            ];
+            
+        } else {
+            // 无结果，构建无结果的响应
+            $response = [
+                'success' => true,
+                'html' => '',
+                'hasMore' => false,
+                'resultCount' => 0,
+                'message' => '检索成功，但没有找到匹配的结果。',
+            ];
+        }
     }
 
-    die(); // 防止WordPress进一步处理或重定向
+    //var_dump($response);  //调试用代码，用于在浏览器控制台里输出JSON响应相关的信息。
+    echo json_encode($response);  //利用下面的钩子将结果返回到了admin-post.php。
+    die();
 }
-add_action('admin_post_nopriv_custom_search', 'custom_search');  //此为钩子，钩子中的函数名一定要正确。
-add_action('admin_post_custom_search', 'custom_search');
+add_action('admin_post_nopriv_custom_search', 'custom_search');  //钩子，未登录用户。
+add_action('admin_post_custom_search', 'custom_search');  //钩子，登录用户。
+
+
 
