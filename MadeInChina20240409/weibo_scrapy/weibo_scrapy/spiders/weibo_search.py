@@ -77,45 +77,45 @@ class WeiboSearchSpider(RedisSpider):
         for user_id in user_ids:
             user_id = user_id.strip()
             url = f'https://m.weibo.cn/api/container/getIndex?containerid=230413{user_id}_-_WEIBO_SECOND_PROFILE_WEIBO'
-            meta = {'user_id': user_id,'url':url, 'cookiejar':1, 'headers':json.dumps(headers), 'scroll_count': 0}
-            # 判断 URL 是否已存在于 Redis 中
-            if not self.redis_conn.sismember('visited_urls', url):
-                # 将生成的 URL 注入到 Redis 列表中
-                result = self.redis_conn.lpush(self.redis_key, url)
-                # 判断注入是否成功
-                if result > 0:
-                    injected_count += 1
-                    custom_logger.info(f"成功注入用户 {user_id} 的URL。")
-                    # 将 URL 添加到已访问集合中
-                    self.redis_conn.sadd('visited_urls', url)
-                    # 将元数据注入到 Redis 哈希表中
-                    self.redis_conn.hmset(f'meta:{url}', meta)
-            else:
-                custom_logger.info(f"用户 {user_id} 的URL已存在，跳过注入Redis。")
-        # 检查 Redis 列表中的 URL 数量
-        queue_length = self.redis_conn.llen(self.redis_key)
-        custom_logger.info(f"成功注入了 {injected_count} 个 URL至Redis 队列 {self.redis_key} 中，还有 {queue_length} 个待处理的 URL。")
+        #     meta = {'user_id': user_id,'url':url, 'cookiejar':1, 'headers':json.dumps(headers), 'scroll_count': 0}
+        #     # 判断 URL 是否已存在于 Redis 中
+        #     if not self.redis_conn.sismember('visited_urls', url):
+        #         # 将生成的 URL 注入到 Redis 列表中
+            self.redis_conn.lpush(self.redis_key, url)
+        #         # 判断注入是否成功
+        #         if result > 0:
+        #             injected_count += 1
+        #             custom_logger.info(f"成功注入用户 {user_id} 的URL。")
+        #             # 将 URL 添加到已访问集合中
+        #             self.redis_conn.sadd('visited_urls', url)
+        #             # 将元数据注入到 Redis 哈希表中
+        #             self.redis_conn.hmset(f'meta:{url}', meta)
+        #     else:
+        #         custom_logger.info(f"用户 {user_id} 的URL已存在，跳过注入Redis。")
+        # # 检查 Redis 列表中的 URL 数量
+        # queue_length = self.redis_conn.llen(self.redis_key)
+        # custom_logger.info(f"成功注入了 {injected_count} 个 URL至Redis 队列 {self.redis_key} 中，还有 {queue_length} 个待处理的 URL。")
+        #
+        # if queue_length == 0:
+        #     custom_logger.info("Redis 队列为空，关闭爬虫。")
+        #     raise CloseSpider(reason='Redis 队列为空')
+        # else:
+        #     # 生成初始请求
+        #     while True:
+        #         url = self.redis_conn.lpop(self.redis_key)
+        #         if url is None:
+        #             break
+        #         yield self.make_requests_from_url(url)
 
-        if queue_length == 0:
-            custom_logger.info("Redis 队列为空，关闭爬虫。")
-            raise CloseSpider(reason='Redis 队列为空')
-        else:
-            # 生成初始请求
-            while True:
-                url = self.redis_conn.lpop(self.redis_key)
-                if url is None:
-                    break
-                yield self.make_requests_from_url(url)
 
 
+            yield scrapy.Request(url = url, headers=headers, cookies=cookies, callback=self.parse, meta={'user_id': user_id,'url':url, 'cookiejar':1, 'headers':headers, 'scroll_count': 0})
 
-            # yield scrapy.Request(url = url, headers=headers, cookies=cookies, callback=self.parse, meta={'user_id': user_id,'url':url, 'cookiejar':1, 'headers':headers, 'scroll_count': 0})
-
-    def make_requests_from_url(self, url):
-        # 从 Redis 哈希表中获取元数据
-        meta = self.redis_conn.hgetall(f'meta:{url}')
-        headers = json.loads(meta.pop('headers'))
-        return scrapy.Request(url, headers=headers, cookies=meta.get('cookies'), callback=self.parse, meta=meta)
+    # def make_requests_from_url(self, url):
+    #     # 从 Redis 哈希表中获取元数据
+    #     meta = self.redis_conn.hgetall(f'meta:{url}')
+    #     headers = json.loads(meta.pop('headers'))
+    #     return scrapy.Request(url, headers=headers, cookies=meta.get('cookies'), callback=self.parse, meta=meta)
 
     def parse(self, response):
         #print("响应的文本内容：" + response.text)

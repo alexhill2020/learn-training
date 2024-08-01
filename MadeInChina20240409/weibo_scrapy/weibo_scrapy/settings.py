@@ -109,7 +109,6 @@ DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
 
 # 持久化调度队列，即使关闭也不会清空
 SCHEDULER_PERSIST = True
-SCHEDULER_FLUSH_ON_START = True
 
 # 使用 scrapy-redis 的请求队列
 SCHEDULER_QUEUE_CLASS = 'scrapy_redis.queue.SpiderPriorityQueue'
