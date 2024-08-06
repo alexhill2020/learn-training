@@ -88,7 +88,7 @@ class WeiboSearchSpider(RedisSpider):
         scroll_count = response.meta['scroll_count']  # 获取下滚次数
 
         if response_data.get('ok') == 1:
-            since_id = response_data.get('data', {}).get('cardlistInfo', {}).get('since_id', None)  # 获取下一页的since_id。
+            since_id = response_data.get('data', {}).get('cardlistInfo', {}).get('since_id', "未获取到下一页的since_id")  # 获取下一页的since_id。
 
             cards = response_data.get('data', {}).get('cards', [])  # 此时，cards是一个列表。
 
@@ -99,101 +99,37 @@ class WeiboSearchSpider(RedisSpider):
 
                 item['since_id'] = since_id
                 item['user_id'] = user_id
-                if card.get('card_type') == 11:  # 置顶微博模块，不是每个用户都有置顶微博，要注意。
-                    if card.get('show_type') == 3:
-                        for micro_card in card['card_group']:
+                if card.get('card_type') == 11 and card.get('show_type') == 3:  # 置顶微博模块，不是每个用户都有置顶微博，要注意。
+                    for micro_card in card['card_group']:
 
-                            # 解析微博发布时间
-                            created_at_str = micro_card['mblog']['created_at']
-                            try:
-                                created_at = datetime.strptime(created_at_str, '%a %b %d %H:%M:%S %z %Y')
-                            except ValueError:
-                                continue  # 如果解析失败，跳过该微博
+                        # 解析微博发布时间
+                        created_at_str = micro_card['mblog']['created_at']
+                        try:
+                            created_at = datetime.strptime(created_at_str, '%a %b %d %H:%M:%S %z %Y')
+                        except ValueError:
+                            continue  # 如果解析失败，跳过该微博
 
-                            # 检查发布时间是否在指定范围内
-                            if start_date <= created_at <= end_date:
+                        # 检查发布时间是否在指定范围内
+                        if start_date <= created_at <= end_date:
+                            item = self.crawl_parse(micro_card, item, created_at_str)  #引入crawl_parse函数，更新item。
 
-                                item['crawl_time'] = time
-                                item['created_at'] = micro_card['mblog']['created_at']
-                                item['id'] = micro_card['mblog']['id']
-                                item['text'] = micro_card['mblog']['text']
-                                item['source'] = micro_card['mblog'].get('source', '')
-                                item['reposts_count'] = micro_card['mblog']['reposts_count']
-                                item['comments_count'] = micro_card['mblog']['comments_count']
-                                item['reprint_cmt_count'] = micro_card['mblog']['reprint_cmt_count']
-                                item['attitudes_count'] = micro_card['mblog']['attitudes_count']
-                                item['user_name'] = micro_card['mblog']['user']['screen_name']  #用户名
-                                item['user_description'] = micro_card['mblog']['user']['description']  #用户描述
-                                item['user_follow_count'] = micro_card['mblog']['user']['follow_count']  #关注者
-                                item['user_followers_count'] = micro_card['mblog']['user']['followers_count']  #粉丝数
-                                item['user_statuses_count'] = micro_card['mblog']['user']['statuses_count']  #所发微博问题
-                                item['user_verified'] = micro_card['mblog']['user']['verified'] #是否认证
-                                item['user_verified_reason'] = micro_card['mblog']['user']['verified_reason']  # 是否认证
+                            if f'''<a href="/status/{item['id']}">全文</a>''' in item['text']:
+                                yield scrapy.Request(self.status_url.format(id=item['id']),
+                                                     callback=self.parse_status,
+                                                     meta={'item': item,
+                                                           'cookiejar': response.meta.get('cookiejar'),
+                                                           'headers': response.meta.get('headers')})
+                            else:
+                                yield item
 
-                                # 上面的为原创微博，这里是判断是否为转发，如是转发微博则同时提取被转发微博的信息
-                                retweeted_status_microcard = micro_card['mblog'].get('retweeted_status')
-                                if retweeted_status_microcard:
-                                    item['retweet'] = 1  #如果为转发，则转发为1
-                                    item['retweet_text'] = micro_card['mblog']['retweeted_status']['text']
-                                    item['retweet_created_at'] = micro_card['mblog']['retweeted_status']['created_at']
-                                    item['retweet_id'] = micro_card['mblog']['retweeted_status']['id']
-                                    item['retweet_source'] = micro_card['mblog']['retweeted_status'].get('source', '')
-                                    item['retweet_reposts_count'] = micro_card['mblog']['retweeted_status']['reposts_count']
-                                    item['retweet_comments_count'] = micro_card['mblog']['retweeted_status']['comments_count']
-                                    item['retweet_reprint_cmt_count'] = micro_card['mblog']['retweeted_status']['reprint_cmt_count']
-                                    item['retweet_attitudes_count'] = micro_card['mblog']['retweeted_status']['attitudes_count']
-                                    item['retweet_user_name'] = micro_card['mblog']['retweeted_status']['user'][
-                                        'screen_name']  # 用户名
-                                    item['retweet_user_id'] = micro_card['mblog']['retweeted_status']['user'][
-                                        'id']  # 用户描述
-                                    item['retweet_user_description'] = micro_card['mblog']['retweeted_status']['user'][
-                                        'description']  # 用户描述
-                                    item['retweet_user_follow_count'] = micro_card['mblog']['retweeted_status']['user'][
-                                        'follow_count']  # 关注者
-                                    item['retweet_user_followers_count'] = micro_card['mblog']['retweeted_status']['user'][
-                                        'followers_count']  # 粉丝数
-                                    item['retweet_user_statuses_count'] = micro_card['mblog']['retweeted_status']['user'][
-                                        'statuses_count']  # 所发微博数
-                                    item['retweet_user_verified'] = micro_card['mblog']['retweeted_status']['user'][
-                                        'verified']  # 是否认证
-                                    item['retweet_user_verified_reason'] = micro_card['mblog']['retweeted_status']['user'][
-                                        'verified_reason']  # 是否认证
+                            count += 1  # 只有符合条件时才更新计数器，证明此微博已收集到item
 
-                                else:   # 如果有转发即为已有的值，否则设默认值，主要是为了数据格式统一
-                                    item['retweet'] = 0
-                                    item['retweet_text'] = ''
-                                    item['retweet_created_at'] = ''
-                                    item['retweet_id'] = ''
-                                    item['retweet_source'] = ''
-                                    item['retweet_reposts_count'] = 0
-                                    item['retweet_comments_count'] = 0
-                                    item['retweet_reprint_cmt_count'] = 0
-                                    item['retweet_attitudes_count'] = 0
-                                    item['retweet_user_name'] = ''
-                                    item['retweet_user_id'] = ''
-                                    item['retweet_user_description'] = ''
-                                    item['retweet_user_follow_count'] = 0
-                                    item['retweet_user_followers_count'] = 0
-                                    item['retweet_user_statuses_count'] = 0
-                                    item['retweet_user_verified'] = False
-                                    item['retweet_user_verified_reason'] = ''
+                            # 更新每个用户总计抓取的item的计数器
+                            if user_id in self.user_item_count:
+                                self.user_item_count[user_id] += 1
+                            else:
+                                self.user_item_count[user_id] = 1
 
-                                count += 1  # 只有符合条件时才更新计数器，证明此微博已收集到item
-
-                                # 更新每个用户总计抓取的item的计数器
-                                if user_id in self.user_item_count:
-                                    self.user_item_count[user_id] += 1
-                                else:
-                                    self.user_item_count[user_id] = 1
-
-                                # 检查 'text' 中是否包含特定子字符串，即是否还未显示完全文。
-                                if f'''<a href="/status/{item['id']}">全文</a>''' in item['text']:
-                                    yield scrapy.Request(self.status_url.format(id=item['id']),
-                                                         callback=self.parse_status,
-                                                         meta={'item': item, 'cookiejar': response.meta.get('cookiejar'),
-                                                               'headers': response.meta.get('headers')})
-                                else:
-                                    yield item
                 elif card.get('card_type') == 9:  # 非置顶微博模块
 
                     # 解析微博发布时间
@@ -207,70 +143,18 @@ class WeiboSearchSpider(RedisSpider):
 
                     # 检查发布时间是否在指定范围内
                     if start_date <= created_at <= end_date:
+
+                        item = self.crawl_parse(card, item, created_at_str)  # 引入crawl_parse函数，更新item。
                         count += 1  # 只有符合条件时才更新计数器
 
-                        item['crawl_time'] = time
-                        item['created_at'] = card['mblog']['created_at']
-                        item['id'] = card['mblog']['id']
-                        item['text'] = card['mblog']['text']
-                        item['source'] = card['mblog'].get('source', '')
-                        item['reposts_count'] = card['mblog']['reposts_count']
-                        item['comments_count'] = card['mblog']['comments_count']
-                        item['reprint_cmt_count'] = card['mblog']['reprint_cmt_count']
-                        item['attitudes_count'] = card['mblog']['attitudes_count']
-                        item['user_name'] = card['mblog']['user']['screen_name']  # 用户名
-                        item['user_description'] = card['mblog']['user']['description']  # 用户描述
-                        item['user_follow_count'] = card['mblog']['user']['follow_count']  # 关注者
-                        item['user_followers_count'] = card['mblog']['user']['followers_count']  # 粉丝数
-                        item['user_statuses_count'] = card['mblog']['user']['statuses_count']  # 所发微博总数
-                        item['user_verified'] = card['mblog']['user']['verified']  # 是否认证
-
-                        retweeted_status = card['mblog'].get('retweeted_status')
-                        if retweeted_status:
-                            item['retweet'] = 1  # 如果为转发，则转发为1
-                            item['retweet_text'] = card['mblog']['retweeted_status']['text']
-                            item['retweet_created_at'] = card['mblog']['retweeted_status']['created_at']
-                            item['retweet_id'] = card['mblog']['retweeted_status']['id']
-                            item['retweet_source'] = card['mblog']['retweeted_status'].get('source', '')
-                            item['retweet_reposts_count'] = card['mblog']['retweeted_status']['reposts_count']
-                            item['retweet_comments_count'] = card['mblog']['retweeted_status']['comments_count']
-                            item['retweet_reprint_cmt_count'] = card['mblog']['retweeted_status']['reprint_cmt_count']
-                            item['retweet_attitudes_count'] = card['mblog']['retweeted_status']['attitudes_count']
-                            item['retweet_user_name'] = card['mblog']['retweeted_status']['user'][
-                                'screen_name']  # 用户名
-                            item['retweet_user_id'] = card['mblog']['retweeted_status']['user'][
-                                'id']  # 用户描述
-                            item['retweet_user_description'] = card['mblog']['retweeted_status']['user'][
-                                'description']  # 用户描述
-                            item['retweet_user_follow_count'] = card['mblog']['retweeted_status']['user'][
-                                'follow_count']  # 关注者
-                            item['retweet_user_followers_count'] = card['mblog']['retweeted_status']['user'][
-                                'followers_count']  # 粉丝数
-                            item['retweet_user_statuses_count'] = card['mblog']['retweeted_status']['user'][
-                                'statuses_count']  # 所发微博数
-                            item['retweet_user_verified'] = card['mblog']['retweeted_status']['user'][
-                                'verified']  # 是否认证
-                            item['retweet_user_verified_reason'] = card['mblog']['retweeted_status']['user'][
-                                'verified_reason']  # 是否认证
-
+                        if f'''<a href="/status/{item['id']}">全文</a>''' in item['text']:
+                            yield scrapy.Request(self.status_url.format(id=item['id']),
+                                                 callback=self.parse_status,
+                                                 meta={'item': item,
+                                                       'cookiejar': response.meta.get('cookiejar'),
+                                                       'headers': response.meta.get('headers')})
                         else:
-                            item['retweet'] = 0
-                            item['retweet_text'] = ''
-                            item['retweet_created_at'] = ''  # 原始微博的创建时间
-                            item['retweet_id'] = ''
-                            item['retweet_source'] = ''
-                            item['retweet_reposts_count'] = 0
-                            item['retweet_comments_count'] = 0
-                            item['retweet_reprint_cmt_count'] = 0
-                            item['retweet_attitudes_count'] = 0
-                            item['retweet_user_name'] = ''
-                            item['retweet_user_id'] = ''
-                            item['retweet_user_description'] = ''
-                            item['retweet_user_follow_count'] = 0
-                            item['retweet_user_followers_count'] = 0
-                            item['retweet_user_statuses_count'] = 0
-                            item['retweet_user_verified'] = False
-                            item['retweet_user_verified_reason'] = ''
+                            yield item
 
                         # 更新用户抓取计数器
                         if user_id in self.user_item_count:
@@ -278,14 +162,6 @@ class WeiboSearchSpider(RedisSpider):
                         else:
                             self.user_item_count[user_id] = 1
 
-                        # 检查 'text' 中是否包含特定子字符串，即是否还未显示完全文。
-                        if f'''<a href="/status/{item['id']}">全文</a>''' in item['text']:
-                            yield scrapy.Request(self.status_url.format(id=item['id']),
-                                                 callback=self.parse_status,
-                                                 meta={'item': item, 'cookiejar': response.meta.get('cookiejar'),
-                                                       'headers': response.meta.get('headers')})
-                        else:
-                            yield item
 
             # 增加下滚次数
             n = statuses_count // 10 - scroll_count
@@ -296,6 +172,53 @@ class WeiboSearchSpider(RedisSpider):
                 yield scrapy.Request(self.new_url.format(user_id=user_id, since_id=since_id), callback=self.weibo_parse,
                                      meta={'cookiejar': response.meta['cookiejar'],
                                            'headers': response.meta['headers'], 'scroll_count': scroll_count, 'user_id': user_id, 'user_name':user_name, 'statuses_count': statuses_count})
+
+    # 微博内容提取函数
+    def crawl_parse(self, card, item, created_at_str):
+        item.update({
+            'crawl_time': datetime.now(),
+            'created_at': created_at_str,
+            'id': card['mblog']['id'],
+            'text': card['mblog']['text'],
+            'source': card['mblog'].get('source', ''),
+            'reposts_count': card['mblog']['reposts_count'],
+            'comments_count': card['mblog']['comments_count'],
+            'reprint_cmt_count': card['mblog']['reprint_cmt_count'],
+            'attitudes_count': card['mblog']['attitudes_count'],
+            'user_name': card['mblog']['user']['screen_name'],
+            'user_description': card['mblog']['user']['description'],
+            'user_follow_count': card['mblog']['user']['follow_count'],
+            'user_followers_count': card['mblog']['user']['followers_count'],
+            'user_statuses_count': card['mblog']['user']['statuses_count'],
+            'user_verified': card['mblog']['user']['verified'],
+        })
+
+        retweeted_status = card['mblog'].get('retweeted_status', {})
+        item.update({
+            'retweet': int(bool(retweeted_status)),
+            'retweet_text': retweeted_status.get('text', ''),
+            'retweet_created_at': retweeted_status.get('created_at', ''),
+            'retweet_id': retweeted_status.get('id', ''),
+            'retweet_source': retweeted_status.get('source', ''),
+            'retweet_reposts_count': retweeted_status.get('reposts_count', 0),
+            'retweet_comments_count': retweeted_status.get('comments_count', 0),
+            'retweet_reprint_cmt_count': retweeted_status.get('reprint_cmt_count', 0),
+            'retweet_attitudes_count': retweeted_status.get('attitudes_count', 0),
+            'retweet_user_name': retweeted_status.get('user', {}).get('screen_name', ''),
+            'retweet_user_id': retweeted_status.get('user', {}).get('id', ''),
+            'retweet_user_description': retweeted_status.get('user', {}).get('description', ''),
+            'retweet_user_follow_count': retweeted_status.get('user', {}).get('follow_count',
+                                                                              0),
+            'retweet_user_followers_count': retweeted_status.get('user', {}).get(
+                'followers_count', 0),
+            'retweet_user_statuses_count': retweeted_status.get('user', {}).get(
+                'statuses_count', 0),
+            'retweet_user_verified': retweeted_status.get('user', {}).get('verified', False),
+            'retweet_user_verified_reason': retweeted_status.get('user', {}).get(
+                'verified_reason', ''),
+        })
+
+        return item
 
     # 显示全文
     def parse_status(self, response):
