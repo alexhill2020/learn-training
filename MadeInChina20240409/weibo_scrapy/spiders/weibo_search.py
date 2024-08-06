@@ -71,6 +71,7 @@ class WeiboSearchSpider(RedisSpider):
             pattern = r"value=(\d+)&containerid"
             match = re.search(pattern, response.url)
             user_id = match.group(1)
+            self.user_item_count[user_id] = 0
             yield scrapy.Request(url=self.url.format(user_id=user_id), callback=self.weibo_parse,
                                  meta={'user_id': user_id, 'user_name': user_name, 'statuses_count': statuses_count,
                                        'cookiejar': response.meta.get('cookiejar'),
