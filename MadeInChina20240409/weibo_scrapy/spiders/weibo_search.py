@@ -1,15 +1,21 @@
 import scrapy
+import re
 import os
 import logging
 from datetime import datetime, timezone
 from weibo_scrapy.items import WeiboScrapyItem
+import redis
 from scrapy_redis.spiders import RedisSpider
+import hashlib
+from scrapy.utils.reqser import request_to_dict
+from scrapy.utils.request import request_fingerprint
+from scrapy.http import Request
 
 # 事实证明在断点续爬的时候只要redis的weibo_search:request里有网址，则会继续爬，没有网址，或者是只有爬完就结束的网址，则不会继续爬。
-# 因此实现断点续爬的关键点就是如何确保其request里一直有网址。
+# 因此实现断点续爬的关键点就是如何确保其request里一直有网址，没有网址的原因是URL处理速度快于URL的生成速度，导致Redis队列中的URL被迅速处理完，从而无法维持持续的抓取。
 # 研究了一晚上，断点续爬没有更好的方式了，主要是不能确保weibo_search:request里一定会有可以延伸的网址，目前只能是这个样子了。
-# 所以最好的方式还是不要让其断掉，这只是救急之策。
-# 经验证，必须三个dont_filter=True都必须有。但是三个都有的话，每重新启动一次，就要重新发一次，要从0开始，如果重新启动2次，就要从0开始2次，这怎么办？
+# 要解决此问题主要有两种方式：确保有足够的初始URL、并发请求数减少（settings.py中设置），本来想动态生态url再手工推送到requests列，但细想不行，因此本来产生的url就全部都要推送过去，手工推动只是白用工。
+
 
 # 获取自定义日志记录器
 custom_logger = logging.getLogger('custom_logger')  #已在setting.py中设置好
@@ -27,7 +33,7 @@ end_date = datetime(2024, 7, 31, tzinfo=timezone.utc)
 
 class WeiboSearchSpider(RedisSpider):
     name = 'weibo_search'
-    allowed_domains = ['m.weibo.cn']  # 利用redis进行分布式爬虫需注销掉这个
+    # allowed_domains = ['m.weibo.cn']  # 利用redis进行分布式爬虫需注销掉这个
 
     # 用Redis进行分布式爬虫时用于存储初始URL的 Redis key
     redis_key = 'weibo_search:start_urls'
@@ -44,9 +50,7 @@ class WeiboSearchSpider(RedisSpider):
         # 初始化各微博用户（user_id）抓取item数量计数器
         self.user_item_count = {}
 
-    def start_requests(self):
-
-        headers = {
+        self.headers = {
             'Accept': 'application/json, text/plain, */*',
             #'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
             'Referer': 'https://m.weibo.cn/',
@@ -56,36 +60,90 @@ class WeiboSearchSpider(RedisSpider):
 
         # cookies时不时会变，上面的x-xsrf-token时不时也会变，一定要注意观察待爬取网址的请求头，做相应的修改。
         temp = '_T_WM=2a49f655949fe128a72e77d0c7660284; SCF=An88pjtFAEn9F8u7w53WMXvci1cCd8e6v5TeBL0pj8Sd2fbwpbIhzsSJc3W2b3cq4oS9GXXTNMzIqsZCniJ62ik.; SUB=_2A25Lo-RuDeRhGeNP6VMU8SjEwjSIHXVowXmmrDV6PUJbktAbLWunkW1NTr09mBSJmfd5HmmXxU1czGYJXgMXIqDR; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhKlxWT8Vs0ffppg0hdSMBY5NHD95QfeKzpSK2c1h.RWs4Dqcjsds_09sir; ALF=1724850494; MLOGIN=1; WEIBOCN_FROM=1110006030; XSRF-TOKEN=888ee4; mweibo_short_token=230e6de4d7; M_WEIBOCN_PARAMS=luicode%3D10000011%26lfid%3D1076032050142347%26fid%3D1005052050142347%26uicode%3D10000011'
-        cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
+        self.cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
 
-        # 获取users_id.txt文件的相对路径
-        current_dir = os.path.dirname(__file__)  # 获取当前文件的目录
-        file_path = os.path.join(current_dir, '..', '..', 'users_id.txt')  # 构建 user_id.txt 文件的相对路径
-        file_path = os.path.abspath(file_path)  # 规范化路径
+        # 连接Redis
+        self.redis_conn = redis.StrictRedis(host='139.186.165.94', port=10001, db=0)
 
-        # 从文件中读取user_id
-        with open(file_path, 'r') as file:
-            user_ids = file.readlines()
+        # 连接并Redis，并检查其requests队列是否为空，如果为空则推送新的url。
+        if self.redis_conn.llen(self.redis_key) == 0:
+            # 循环接收用户输入，直到找到在redis库中未被处理过的网址
+            while True:
+                user_input1 = input("请输入要继续爬取的user_id：")
+                user_input2 = input("请输入要继续爬取的since_id：")
 
-        # 逐行读取微博用户ID
-        for user_id in user_ids:
-            user_id = user_id.strip()
+                continue_url = self.new_url.format(user_id=user_input1, since_id=user_input2)
 
-            self.user_item_count[user_id] = 0   #先在user_item_count字典中存入user_id键（赋值为0），否则后面在这个字典找不到以user_id为键名的键会同问题。
+                # 生成指纹
+                request = Request(continue_url)
+                fp = request_fingerprint(request)
 
-            # 先爬取用户信息页，提取用户名字和发表微博数量等信息，以在爬取具体微博时使用（主要是避免一页中没有任务符合要求的微博，否则可以不用先爬这个页面而直接到微博中去取用户信息）。
-            yield scrapy.Request(url = self.user_url.format(user_id=user_id), headers=headers, cookies=cookies, callback=self.parse, meta={'user_id': user_id, 'cookiejar':1, 'headers':headers})
+                # 检查此网址是否已经在 Redis 库里被处理过
+                if self.redis_conn.sismember('weibo_search:dupefilter', fp):
+                    print("此网址已经被处理过，请重新输入。")
+                else:
+                    self.redis_conn.lpush(self.redis_key, continue_url)
+                    print(f"你输入的是：{continue_url}，已被注入redis库。")
+                    break
+
+
+
+    # 重写make_requests_from_url方法，加入自定义的headers和cookies
+    def make_requests_from_url(self, url):
+        return scrapy.Request(url=url, headers=self.headers, cookies=self.cookies, callback=self.parse)
 
     #用户信息页提取
     def parse(self, response):
         response_data = response.json()
-        user_id = response.meta['user_id']  # 继承user_id
-        user_name = response_data.get('data',{}).get('userInfo',{}).get('screen_name',None) # 获取用户名
-        statuses_count = response_data.get('data', {}).get('userInfo', {}).get('statuses_count',None) #获取发微博数量
+        #response.url
+        print(f'{response.url}')
 
-        yield scrapy.Request(url=self.url.format(user_id=user_id), callback=self.weibo_parse,
-                             meta={'user_id': user_id, 'user_name': user_name,'statuses_count': statuses_count, 'cookiejar': response.meta.get('cookiejar'),
-                                                               'headers': response.meta.get('headers'),'scroll_count': 0})  # 'scroll_count': 0为设置滚动次数为0
+        if "containerid=230413" in response.url and "_-_WEIBO_SECOND_PROFILE_WEIBO" in response.url:
+            pattern = r"containerid=230413(\d+)_-_WEIBO_SECOND_PROFILE_WEIBO"
+            match = re.search(pattern, response.url)
+            user_id = match.group(1)
+            user_name = response_data.get('data').get('cards')[0].get('mblog').get('user').get('screen_name')
+            statuses_count = response_data.get('data').get('cards')[0].get('mblog').get('user').get('statuses_count')
+            # 检查变量 scroll_count 是否存在
+            if 'scroll_count' not in locals():
+                print(f"名字为{user_name},id为{user_id}，微博总数为{statuses_count}")
+                user_input = input("请输入已滚动次数（整数）：")
+                scroll_count = user_input
+                a = self.item_crawl(response, response_data, user_id, user_name, statuses_count, scroll_count)
+                print('a')
+
+
+
+            # yield scrapy.Request(url=self.url.format(user_id=user_id), callback=self.weibo_parse,
+            #                      meta={'user_id': user_id, 'user_name': user_name, 'statuses_count': statuses_count,
+            #                            'cookiejar': response.meta.get('cookiejar'),
+            #                            'headers': response.meta.get('headers'),
+            #                            'scroll_count': 0})  # 'scroll_count': 0为设置滚动次数为0
+
+
+
+        elif "type=uid&value=" in response.url and "containerid=100505" in response.url:
+            pattern = r"value=(\d+)&containerid"
+            match = re.search(pattern, response.url)
+            user_id = match.group(1)
+            user_name = response_data.get('data', {}).get('userInfo', {}).get('screen_name', None)  # 获取用户名
+            statuses_count = response_data.get('data', {}).get('userInfo', {}).get('statuses_count', None)  # 获取发微博数量
+            yield scrapy.Request(url=self.url.format(user_id=user_id), callback=self.weibo_parse,
+                                 meta={'user_id': user_id, 'user_name': user_name, 'statuses_count': statuses_count,
+                                       'cookiejar': response.meta.get('cookiejar'),
+                                       'headers': response.meta.get('headers'),
+                                       'scroll_count': 0})  # 'scroll_count': 0为设置滚动次数为0
+
+        else:
+            custom_logger.info("user_id不存在")
+
+        # #user_id = response.meta['user_id']  # 继承user_id
+        # user_name = response_data.get('data',{}).get('userInfo',{}).get('screen_name',None) # 获取用户名
+        # statuses_count = response_data.get('data', {}).get('userInfo', {}).get('statuses_count',None) #获取发微博数量
+
+        # yield scrapy.Request(url=self.url.format(user_id=user_id), callback=self.weibo_parse,
+        #                      meta={'user_id': user_id, 'user_name': user_name,'statuses_count': statuses_count, 'cookiejar': response.meta.get('cookiejar'),
+        #                                                        'headers': response.meta.get('headers'),'scroll_count': 0})  # 'scroll_count': 0为设置滚动次数为0
     # 全部发表微博的滚动提取
     def weibo_parse(self, response):
 
@@ -94,6 +152,12 @@ class WeiboSearchSpider(RedisSpider):
         user_name = response.meta['user_name']
         statuses_count = response.meta['statuses_count']
         scroll_count = response.meta['scroll_count']  # 获取下滚次数
+
+        self.item_crawl(response, response_data, user_id, user_name, statuses_count, scroll_count)
+
+    def item_crawl(self,response, response_data, user_id, user_name, statuses_count, scroll_count):
+
+        print("进入item_crawl函数")
 
         if response_data.get('ok') == 1:
             since_id = response_data.get('data', {}).get('cardlistInfo', {}).get('since_id', "未获取到下一页的since_id")  # 获取下一页的since_id。
@@ -176,9 +240,13 @@ class WeiboSearchSpider(RedisSpider):
 
             scroll_count += 1
             if since_id:
-                yield scrapy.Request(self.new_url.format(user_id=user_id, since_id=since_id), callback=self.weibo_parse,
+                new_url = self.new_url.format(user_id=user_id, since_id=since_id)
+                yield scrapy.Request(new_url, callback=self.weibo_parse,
                                      meta={'cookiejar': response.meta['cookiejar'],
                                            'headers': response.meta['headers'], 'scroll_count': scroll_count, 'user_id': user_id, 'user_name':user_name, 'statuses_count': statuses_count})
+            else:
+                custom_logger.info(f"{user_name}({user_id}) 共发表{statuses_count}条微博，现已经没有since_id，已经爬至最后一页。总共下滚{scroll_count}次，抓取到{count}个符合要求的item。")
+        return "dedgdsdg"
 
     # 微博内容提取函数
     def crawl_parse(self, card, item, created_at_str):
@@ -203,29 +271,47 @@ class WeiboSearchSpider(RedisSpider):
         })
 
         retweeted_status = card['mblog'].get('retweeted_status', {})
-        item.update({
-            'retweet': int(bool(retweeted_status)),
-            'retweet_text': retweeted_status.get('text', ''),
-            'retweet_created_at': retweeted_status.get('created_at', ''),
-            'retweet_id': retweeted_status.get('id', ''),
-            'retweet_source': retweeted_status.get('source', ''),
-            'retweet_reposts_count': retweeted_status.get('reposts_count', 0),
-            'retweet_comments_count': retweeted_status.get('comments_count', 0),
-            'retweet_reprint_cmt_count': retweeted_status.get('reprint_cmt_count', 0),
-            'retweet_attitudes_count': retweeted_status.get('attitudes_count', 0),
-            'retweet_user_name': retweeted_status.get('user', {}).get('screen_name', ''),
-            'retweet_user_id': retweeted_status.get('user', {}).get('id', ''),
-            'retweet_user_description': retweeted_status.get('user', {}).get('description', ''),
-            'retweet_user_follow_count': retweeted_status.get('user', {}).get('follow_count',
-                                                                              0),
-            'retweet_user_followers_count': retweeted_status.get('user', {}).get(
-                'followers_count', 0),
-            'retweet_user_statuses_count': retweeted_status.get('user', {}).get(
-                'statuses_count', 0),
-            'retweet_user_verified': retweeted_status.get('user', {}).get('verified', False),
-            'retweet_user_verified_reason': retweeted_status.get('user', {}).get(
-                'verified_reason', ''),
-        })
+        # 确保retweeted_status存在时才去获取值，否则直接设为默认值
+        if retweeted_status:
+            item.update({
+                'retweet': 1,
+                'retweet_text': retweeted_status.get('text', ''),
+                'retweet_created_at': retweeted_status.get('created_at', ''),
+                'retweet_id': retweeted_status.get('id', ''),
+                'retweet_source': retweeted_status.get('source', ''),
+                'retweet_reposts_count': retweeted_status.get('reposts_count', 0),
+                'retweet_comments_count': retweeted_status.get('comments_count', 0),
+                'retweet_reprint_cmt_count': retweeted_status.get('reprint_cmt_count', 0),
+                'retweet_attitudes_count': retweeted_status.get('attitudes_count', 0),
+                'retweet_user_name': retweeted_status.get('user', {}).get('screen_name', ''),
+                'retweet_user_id': retweeted_status.get('user', {}).get('id', ''),
+                'retweet_user_description': retweeted_status.get('user', {}).get('description', ''),
+                'retweet_user_follow_count': retweeted_status.get('user', {}).get('follow_count', 0),
+                'retweet_user_followers_count': retweeted_status.get('user', {}).get('followers_count', 0),
+                'retweet_user_statuses_count': retweeted_status.get('user', {}).get('statuses_count', 0),
+                'retweet_user_verified': retweeted_status.get('user', {}).get('verified', False),
+                'retweet_user_verified_reason': retweeted_status.get('user', {}).get('verified_reason', ''),
+            })
+        else:
+            item.update({
+                'retweet': 0,
+                'retweet_text': '',
+                'retweet_created_at': '',
+                'retweet_id': '',
+                'retweet_source': '',
+                'retweet_reposts_count': 0,
+                'retweet_comments_count': 0,
+                'retweet_reprint_cmt_count': 0,
+                'retweet_attitudes_count': 0,
+                'retweet_user_name': '',
+                'retweet_user_id': '',
+                'retweet_user_description': '',
+                'retweet_user_follow_count': 0,
+                'retweet_user_followers_count': 0,
+                'retweet_user_statuses_count': 0,
+                'retweet_user_verified': False,
+                'retweet_user_verified_reason': '',
+            })
 
         return item
 
@@ -237,4 +323,5 @@ class WeiboSearchSpider(RedisSpider):
         if response_data.get('ok') == 1:
             item['text'] = response_data.get('data',{}).get('longTextContent',{})
         yield item
+
 
