@@ -2,10 +2,7 @@ import scrapy
 from scrapy_redis.spiders import RedisSpider
 import logging
 from datetime import datetime, timezone
-from weibo_scrapy.items import WeiboScrapyItem  #能使用,但是为什么带下划线,提示错误?
-from scrapy.utils.project import get_project_settings
-import redis
-import re
+from weibo_scrapy.items import WeiboScrapyItem
 
 # 事实证明在断点续爬的时候只要redis的weibo_search:request里有网址，则会继续爬，没有网址，或者是只有爬完就结束的网址，则不会继续爬。
 # 因此实现断点续爬的关键点就是如何确保其request里一直有网址。
@@ -42,33 +39,8 @@ class WeiboSearchSpider(RedisSpider):
     def __init__(self, *args, **kwargs):
         super(WeiboSearchSpider, self).__init__(*args, **kwargs)
         self.user_item_count = {}  # 初始化各微博用户（user_id）抓取item数量计数器
-        self.settings = get_project_settings()
-        self.redis_conn = self.get_redis_conn()
-        self.load_start_urls()
 
-    def get_redis_conn(self):
-        host = self.settings.get('REDIS_HOST')
-        port = self.settings.get('REDIS_PORT')
-        db = self.settings.get('REDIS_DB')
-        return redis.Redis(host=host, port=port, db=db)
-
-    def load_start_urls(self):
-        # 检查 Redis 列表是否为空
-        if self.redis_conn.llen(self.redis_key) == 0:
-            custom_logger.info(f"Redis 列表 {self.redis_key} 为空，加载初始 URL。")
-            # 读取 user_id 文件
-            user_id_file = 'user_id.txt'
-            with open(user_id_file, 'r') as f:
-                user_ids = f.readlines()
-            # 推送 URL 到 Redis 列表
-            for user_id in user_ids:
-                user_id = user_id.strip()
-                url = self.url.format(user_id=user_id)
-                self.redis_conn.lpush(self.redis_key, url)
-            start_urls_count = self.redis_conn.llen('weibo_search:start_urls')
-            custom_logger.info(f"所有 URL 已成功推送到 Redis 列表 {self.redis_key} 中，个数为{start_urls_count}。")
-
-    def make_requests_from_url(self, url):
+    def start_requests(self):
 
         headers = {
             'Accept': 'application/json, text/plain, */*',
@@ -82,79 +54,53 @@ class WeiboSearchSpider(RedisSpider):
         temp = '_T_WM=2a49f655949fe128a72e77d0c7660284; SCF=An88pjtFAEn9F8u7w53WMXvci1cCd8e6v5TeBL0pj8Sd2fbwpbIhzsSJc3W2b3cq4oS9GXXTNMzIqsZCniJ62ik.; SUB=_2A25Lo-RuDeRhGeNP6VMU8SjEwjSIHXVowXmmrDV6PUJbktAbLWunkW1NTr09mBSJmfd5HmmXxU1czGYJXgMXIqDR; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhKlxWT8Vs0ffppg0hdSMBY5NHD95QfeKzpSK2c1h.RWs4Dqcjsds_09sir; ALF=1724850494; MLOGIN=1; WEIBOCN_FROM=1110006030; XSRF-TOKEN=888ee4; mweibo_short_token=230e6de4d7; M_WEIBOCN_PARAMS=luicode%3D10000011%26lfid%3D1076032050142347%26fid%3D1005052050142347%26uicode%3D10000011'
         cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
 
-        # 使用正则表达式提取 user_id
-        match = re.search(r'containerid=230413(\d+)_-_WEIBO_SECOND_PROFILE_WEIBO', url)
-        if match:
-            user_id = match.group(1)
-            self.user_item_count[user_id] = 0
+        # 从文件中读取user_id
+        file = 'user_id.txt'
+        with open(file, 'r') as file:
+            user_ids = file.readlines()
 
-            return scrapy.Request(url=self.user_url.format(user_id=user_id), headers=headers, cookies=cookies,
-                                  callback=self.parse, meta={'user_id': user_id, 'cookiejar': 1, 'headers': headers},dont_filter=True)  # 这个dont_filter=True必须要，不然断点续爬的网址直接就在这里被过滤掉了
-        else:
-            custom_logger.error(f"无法从 URL 中提取 user_id: {url}")
-            return None
-        #
-        # # 读取 user_id.txt 文件中的所有 user_id
-        # file = 'E:\\PycharmProjects\\MadeInChina20240409\\user_id.txt'
-        # with open(file, 'r') as file:
-        #     user_ids = file.readlines()
-        #
-        # # 读取微博用户ID
-        # for user_id in user_ids:
-        #     user_id = user_id.strip()
-        #
-        #     self.user_item_count[user_id] = 0   #先在user_item_count字典中存入user_id键（赋值为0），否则后面在这个字典找不到以user_id为键名的键会同问题。
-        #
-        #     # 先爬取用户信息页，提取用户名字和发表微博数量等信息，以在爬取具体微博时使用（主要是避免一页中没有任务符合要求的微博，否则可以不用先爬这个页面而直接到微博中去取用户信息）。
-        #     yield scrapy.Request(url = self.user_url.format(user_id=user_id), headers=headers, cookies=cookies, callback=self.parse, meta={'user_id': user_id, 'cookiejar':1, 'headers':headers})
+        # 逐行读取微博用户ID
+        for user_id in user_ids:
+            user_id = user_id.strip()
+
+            self.user_item_count[user_id] = 0   #先在user_item_count字典中存入user_id键（赋值为0），否则后面在这个字典找不到以user_id为键名的键会同问题。
+
+            # 先爬取用户信息页，提取用户名字和发表微博数量等信息，以在爬取具体微博时使用（主要是避免一页中没有任务符合要求的微博，否则可以不用先爬这个页面而直接到微博中去取用户信息）。
+            yield scrapy.Request(url = self.user_url.format(user_id=user_id), headers=headers, cookies=cookies, callback=self.parse, meta={'user_id': user_id, 'cookiejar':1, 'headers':headers})
 
     #用户信息页提取
     def parse(self, response):
         response_data = response.json()
-        user_id = response.meta['user_id']  # 获取原始搜索 URL
-        user_name = response_data.get('data',{}).get('userInfo',{}).get('screen_name',None)
-        statuses_count = response_data.get('data', {}).get('userInfo', {}).get('statuses_count',None)
+        user_id = response.meta['user_id']  # 继承user_id
+        user_name = response_data.get('data',{}).get('userInfo',{}).get('screen_name',None) # 获取用户名
+        statuses_count = response_data.get('data', {}).get('userInfo', {}).get('statuses_count',None) #获取发微博数量
 
         yield scrapy.Request(url=self.url.format(user_id=user_id), callback=self.weibo_parse,
                              meta={'user_id': user_id, 'user_name': user_name,'statuses_count': statuses_count, 'cookiejar': response.meta.get('cookiejar'),
-                                                               'headers': response.meta.get('headers'),'scroll_count': 0}, dont_filter=True)  #要前一个dont_filter=True和这一个dont_filter=True的话，它总是爬取第一页（滚动次数0），不往下滚动。
-    # 发表微博滚动提取
+                                                               'headers': response.meta.get('headers'),'scroll_count': 0})  # 'scroll_count': 0为设置滚动次数为0
+    # 全部发表微博的滚动提取
     def weibo_parse(self, response):
-        #print("响应的文本内容：" + response.text)
-        #item = WeiboScrapyItem()
+
         response_data = response.json()
-        user_id = response.meta['user_id']  # 获取原始搜索 URL
+        user_id = response.meta['user_id']
         user_name = response.meta['user_name']
         statuses_count = response.meta['statuses_count']
-        #print(statuses_count)
         scroll_count = response.meta['scroll_count']  # 获取下滚次数
-        #print(f'scroll_count为 {scroll_count} 。')
-
 
         if response_data.get('ok') == 1:
-            #item = WeiboScrapyItem()
-            #print(f"第{scroll_count}次滚动的url为{response.url}")
-            since_id = response_data.get('data', {}).get('cardlistInfo', {}).get('since_id', None)
-            #item['user_id'] = user_id
-            #print(f"第{scroll_count}次滚动的since_id为{since_id}，user_id为{user_id}。")
+            since_id = response_data.get('data', {}).get('cardlistInfo', {}).get('since_id', None)  # 获取下一页的since_id。
 
             cards = response_data.get('data', {}).get('cards', [])  # 此时，cards是一个列表。
 
             count = 0  # 初始化每页面爬取微博数的计数器，符合要求即加1，否则不加。
             for card in cards:
-                #print(f'第{n}个card: {card}')
-                #item = {}
-                item = WeiboScrapyItem()  # 直接引入item.py中的，比自己定义item={}更安全更稳健
+
+                item = WeiboScrapyItem()  # 直接引入item.py中的，比自己定义item={}更安全更稳健，注意要from weibo_scrapy.items import WeiboScrapyItem。
+
                 item['since_id'] = since_id
-                # item['user_id'] = user_id
-                # print(f"第{scroll_count}次滚动的since_id为{item['since_id']}，user_id为{user_id}。")
-                #print(item['since_id'])
-                #print(str(card.get('card_type')) + 'and' + str(card.get('show_type')))
                 item['user_id'] = user_id
                 if card.get('card_type') == 11:  # 置顶微博模块，不是每个用户都有置顶微博，要注意。
-                    #print("----11----")
                     if card.get('show_type') == 3:
-                        #print("----3----")
                         for micro_card in card['card_group']:
 
                             # 解析微博发布时间
@@ -166,8 +112,6 @@ class WeiboSearchSpider(RedisSpider):
 
                             # 检查发布时间是否在指定范围内
                             if start_date <= created_at <= end_date:
-
-                                count += 1  # 只有符合条件时才更新计数器，证明此微博已收集到item
 
                                 item['crawl_time'] = time
                                 item['created_at'] = micro_card['mblog']['created_at']
@@ -185,7 +129,6 @@ class WeiboSearchSpider(RedisSpider):
                                 item['user_statuses_count'] = micro_card['mblog']['user']['statuses_count']  #所发微博问题
                                 item['user_verified'] = micro_card['mblog']['user']['verified'] #是否认证
                                 item['user_verified_reason'] = micro_card['mblog']['user']['verified_reason']  # 是否认证
-                                #print(str(card.get('card_type')) + item['text'])
 
                                 # 上面的为原创微博，这里是判断是否为转发，如是转发微博则同时提取被转发微博的信息
                                 retweeted_status_microcard = micro_card['mblog'].get('retweeted_status')
@@ -235,6 +178,8 @@ class WeiboSearchSpider(RedisSpider):
                                     item['retweet_user_verified'] = False
                                     item['retweet_user_verified_reason'] = ''
 
+                                count += 1  # 只有符合条件时才更新计数器，证明此微博已收集到item
+
                                 # 更新每个用户总计抓取的item的计数器
                                 if user_id in self.user_item_count:
                                     self.user_item_count[user_id] += 1
@@ -273,14 +218,12 @@ class WeiboSearchSpider(RedisSpider):
                         item['comments_count'] = card['mblog']['comments_count']
                         item['reprint_cmt_count'] = card['mblog']['reprint_cmt_count']
                         item['attitudes_count'] = card['mblog']['attitudes_count']
-                        #if 'user_name' not in item:
                         item['user_name'] = card['mblog']['user']['screen_name']  # 用户名
                         item['user_description'] = card['mblog']['user']['description']  # 用户描述
                         item['user_follow_count'] = card['mblog']['user']['follow_count']  # 关注者
                         item['user_followers_count'] = card['mblog']['user']['followers_count']  # 粉丝数
                         item['user_statuses_count'] = card['mblog']['user']['statuses_count']  # 所发微博总数
                         item['user_verified'] = card['mblog']['user']['verified']  # 是否认证
-                        #print(str(card.get('card_type')) + item['text'])
 
                         retweeted_status = card['mblog'].get('retweeted_status')
                         if retweeted_status:
@@ -352,12 +295,7 @@ class WeiboSearchSpider(RedisSpider):
             if since_id:
                 yield scrapy.Request(self.new_url.format(user_id=user_id, since_id=since_id), callback=self.weibo_parse,
                                      meta={'cookiejar': response.meta['cookiejar'],
-                                           'headers': response.meta['headers'], 'scroll_count': scroll_count, 'user_id': user_id, 'user_name':user_name, 'statuses_count': statuses_count}, dont_filter=True)  #加了这个dont_filter=True后都可以爬取了，但是下滚页面比较乱，估计会有很多重复的。
-        # else:
-        #     queue_length = self.redis_conn.llen(self.redis_key)
-        #     if queue_length == 0:
-        #         custom_logger.info("目前 Redis 库中已经没有要爬取的网址，因此结束爬取。")
-        #         self.crawler.engine.close_spider(self, reason="Redis 队列为空")
+                                           'headers': response.meta['headers'], 'scroll_count': scroll_count, 'user_id': user_id, 'user_name':user_name, 'statuses_count': statuses_count})
 
     # 显示全文
     def parse_status(self, response):
@@ -368,8 +306,3 @@ class WeiboSearchSpider(RedisSpider):
             item['text'] = response_data.get('data',{}).get('longTextContent',{})
         yield item
 
-    # def close(self, reason):
-    #     queue_length = self.redis_conn.llen(self.redis_key)
-    #     if queue_length == 0:
-    #         custom_logger.info("目前 Redis 库中已经没有要爬取的网址，因此结束爬取。")
-    #         self.crawler.engine.close_spider(self, reason="Redis 队列为空")

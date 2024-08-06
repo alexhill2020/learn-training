@@ -16,7 +16,7 @@ NEWSPIDER_MODULE = 'weibo_scrapy.spiders'
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = 'weibo_scrapy (+http://www.yourdomain.com)'
+USER_AGENT = 'weibo_scrapy (+http://www.yourdomain.com)'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
@@ -116,7 +116,7 @@ SCHEDULER_PERSIST = True
 SCHEDULER_QUEUE_CLASS = 'scrapy_redis.queue.SpiderPriorityQueue'
 
 # 配置重爬，每次启动时都会清空redis，方便调试，调试一定要关掉，否则不能断点续爬
-# SCHEDULER_FLUSH_ON_START = True
+SCHEDULER_FLUSH_ON_START = True
 
 # Redis 数据库的连接配置
 REDIS_HOST = '139.186.165.94'
