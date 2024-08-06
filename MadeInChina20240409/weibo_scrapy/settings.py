@@ -16,13 +16,13 @@ NEWSPIDER_MODULE = 'weibo_scrapy.spiders'
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-USER_AGENT = 'weibo_scrapy (+http://www.yourdomain.com)'
+#USER_AGENT = 'weibo_scrapy (+http://www.yourdomain.com)'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 64 #允许发起的最大并发数量，默认为16，这里设为5
+CONCURRENT_REQUESTS = 64 #允许发起的最大并发数量，默认为16，如果启用蜻蜓ip隧道代理，则设置为5，因为隧道代理最大并发数为5
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
@@ -64,8 +64,8 @@ MONGODB_PORT = 27017  #默认端口。
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
     #'weibo_scrapy.middlewares.WeiboScrapyDownloaderMiddleware': 543,
-    'weibo_scrapy.middlewares.RandomUserAgent': 300, # 启用随机请求头
-    #'weibo_scrapy.middlewares.ProxyDownloaderMiddleware': 350,  # 启用ip代理中间件ProxyDownloaderMiddleware
+    'weibo_scrapy.middlewares.RandomUserAgent': 300, # 启用随机请求头中间件
+    #'weibo_scrapy.middlewares.ProxyDownloaderMiddleware': 350,  # 启用ip代理中间件，代理设置在middlewares.py里设置
 }
 
 # Enable or disable extensions
@@ -78,7 +78,7 @@ DOWNLOADER_MIDDLEWARES = {
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
 #    'weibo_scrapy.pipelines.WeiboScrapyPipeline': 300,
-     'weibo_scrapy.pipelines.WeiboScrapyMongoPipeline': 300,
+     'weibo_scrapy.pipelines.WeiboScrapyMongoPipeline': 300,  # 存储的Mongo管道
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -102,9 +102,10 @@ ITEM_PIPELINES = {
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
-RETRY_HTTP_CODES = [401, 403, 408, 414, 500, 502, 503, 504]  #Scrapy 会在遇到这些状态码时自动重试请求
+# Scrapy会在遇到这些状态码时自动重试请求
+RETRY_HTTP_CODES = [401, 403, 408, 414, 500, 502, 503, 504]
 
-# 使用 scrapy-redis 进行分布式爬虫，所要设置的项
+# --------使用 scrapy-redis 进行分布式爬虫所要设置的项--------
 # 使用 scrapy-redis 的调度器和去重类
 SCHEDULER = "scrapy_redis.scheduler.Scheduler"
 DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
@@ -121,22 +122,60 @@ SCHEDULER_FLUSH_ON_START = True
 # Redis 数据库的连接配置
 REDIS_HOST = '139.186.165.94'
 REDIS_PORT = 10001
-REDIS_DB = 0
 REDIS_PARAMS = {
     'password': '',
 }
+REDIS_DB = 0  # 数据库号
 
 # # 可选：将抓取到的数据存储到 Redis 中
 # ITEM_PIPELINES = {
 #     'scrapy_redis.pipelines.RedisPipeline': 300
 # }
-#
+
 # # 可选：配置 Redis 存储抓取数据的键
 # REDIS_ITEMS_KEY = 'scrapy:items'
 
 
+# --------记录日志构造--------
 
-USER_AGENT_LIST =  [  #这些请求头都是在网上复制的。
+import datetime
+import logging
+from logging.handlers import RotatingFileHandler
+
+# 获取当前日期时间
+to_day = datetime.datetime.now()
+log_file_path = 'log/weibo_search_{}_{}_{}_{}{}{}.log'.format(to_day.year, to_day.month, to_day.day, to_day.hour, to_day.minute, to_day.second)
+
+# Scrapy 的默认日志配置
+LOG_ENABLED = True
+LOG_LEVEL = 'DEBUG'
+LOG_FILE = log_file_path
+LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
+LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
+
+# 自定义日志配置
+custom_log_file = 'custom_output.log'
+CUSTOM_LOG_LEVEL = 'INFO'
+CUSTOM_LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
+CUSTOM_LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
+
+# 自定义日志处理程序
+def setup_custom_logging():
+        handler = RotatingFileHandler(custom_log_file, maxBytes=5 * 1024 * 1024, backupCount=5)
+        handler.setFormatter(logging.Formatter(CUSTOM_LOG_FORMAT, datefmt=CUSTOM_LOG_DATEFORMAT))
+
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter(CUSTOM_LOG_FORMAT, datefmt=CUSTOM_LOG_DATEFORMAT))
+
+        custom_logger = logging.getLogger('custom_logger')
+        custom_logger.setLevel(CUSTOM_LOG_LEVEL)
+        custom_logger.addHandler(handler)
+        custom_logger.addHandler(console_handler)
+
+setup_custom_logging()
+
+# --------请求头列表，用于构造随机请求头，这些请求头都是在网上复制的--------
+USER_AGENT_LIST =  [
         "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2227.1 Safari/537.36",
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2227.0 Safari/537.36",
@@ -188,56 +227,6 @@ USER_AGENT_LIST =  [  #这些请求头都是在网上复制的。
         "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.15 (KHTML, like Gecko) Chrome/24.0.1295.0 Safari/537.15",
         "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.14 (KHTML, like Gecko) Chrome/24.0.1292.0 Safari/537.14"
 ]
-
-import datetime
-import logging
-from logging.handlers import RotatingFileHandler
-
-# LOG_LEVEL = 'DEBUG'
-# to_day = datetime.datetime.now()
-# log_file_path = 'log/weibo_search_{}_{}_{}_{}{}{}.log'.format(to_day.year, to_day.month, to_day.day, to_day.hour, to_day.minute, to_day.second)
-# LOG_FILE = log_file_path
-
-
-
-# 获取当前日期时间
-to_day = datetime.datetime.now()
-log_file_path = 'log/weibo_search_{}_{}_{}_{}{}{}.log'.format(to_day.year, to_day.month, to_day.day, to_day.hour, to_day.minute, to_day.second)
-
-# Scrapy 的默认日志配置
-LOG_ENABLED = True
-LOG_LEVEL = 'DEBUG'
-LOG_FILE = log_file_path
-LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
-LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
-
-# 自定义日志配置
-custom_log_file = 'custom_output_new.log'
-CUSTOM_LOG_LEVEL = 'INFO'
-CUSTOM_LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
-CUSTOM_LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
-
-
-# 自定义日志处理程序
-def setup_custom_logging():
-        handler = RotatingFileHandler(custom_log_file, maxBytes=5 * 1024 * 1024, backupCount=5)
-        handler.setFormatter(logging.Formatter(CUSTOM_LOG_FORMAT, datefmt=CUSTOM_LOG_DATEFORMAT))
-
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter(CUSTOM_LOG_FORMAT, datefmt=CUSTOM_LOG_DATEFORMAT))
-
-        custom_logger = logging.getLogger('custom_logger')
-        custom_logger.setLevel(CUSTOM_LOG_LEVEL)
-        custom_logger.addHandler(handler)
-        custom_logger.addHandler(console_handler)
-
-setup_custom_logging()
-
-# # 其他 Scrapy 设置
-# BOT_NAME = 'myproject'
-# SPIDER_MODULES = ['myproject.spiders']
-# NEWSPIDER_MODULE = 'myproject.spiders'
-
 
 # settings.py
 

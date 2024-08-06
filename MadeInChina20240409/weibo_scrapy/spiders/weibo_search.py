@@ -1,8 +1,9 @@
 import scrapy
-from scrapy_redis.spiders import RedisSpider
+import os
 import logging
 from datetime import datetime, timezone
 from weibo_scrapy.items import WeiboScrapyItem
+from scrapy_redis.spiders import RedisSpider
 
 # 事实证明在断点续爬的时候只要redis的weibo_search:request里有网址，则会继续爬，没有网址，或者是只有爬完就结束的网址，则不会继续爬。
 # 因此实现断点续爬的关键点就是如何确保其request里一直有网址。
@@ -23,11 +24,12 @@ custom_logger.info(f"----------开始爬虫，当前时间是：{time}----------
 start_date = datetime(2017, 10, 18, tzinfo=timezone.utc)  #后面是添加时区信息
 end_date = datetime(2024, 7, 31, tzinfo=timezone.utc)
 
+
 class WeiboSearchSpider(RedisSpider):
     name = 'weibo_search'
-    allowed_domains = ['m.weibo.cn']
+    allowed_domains = ['m.weibo.cn']  # 利用redis进行分布式爬虫需注销掉这个
 
-    # Redis key to use for starting URLs
+    # 用Redis进行分布式爬虫时用于存储初始URL的 Redis key
     redis_key = 'weibo_search:start_urls'
 
     # 以下为全局抓取中要用到的url，这里先定义了，主要是为了redis，不然不会被注入redis中。
@@ -38,7 +40,9 @@ class WeiboSearchSpider(RedisSpider):
 
     def __init__(self, *args, **kwargs):
         super(WeiboSearchSpider, self).__init__(*args, **kwargs)
-        self.user_item_count = {}  # 初始化各微博用户（user_id）抓取item数量计数器
+
+        # 初始化各微博用户（user_id）抓取item数量计数器
+        self.user_item_count = {}
 
     def start_requests(self):
 
@@ -54,9 +58,13 @@ class WeiboSearchSpider(RedisSpider):
         temp = '_T_WM=2a49f655949fe128a72e77d0c7660284; SCF=An88pjtFAEn9F8u7w53WMXvci1cCd8e6v5TeBL0pj8Sd2fbwpbIhzsSJc3W2b3cq4oS9GXXTNMzIqsZCniJ62ik.; SUB=_2A25Lo-RuDeRhGeNP6VMU8SjEwjSIHXVowXmmrDV6PUJbktAbLWunkW1NTr09mBSJmfd5HmmXxU1czGYJXgMXIqDR; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhKlxWT8Vs0ffppg0hdSMBY5NHD95QfeKzpSK2c1h.RWs4Dqcjsds_09sir; ALF=1724850494; MLOGIN=1; WEIBOCN_FROM=1110006030; XSRF-TOKEN=888ee4; mweibo_short_token=230e6de4d7; M_WEIBOCN_PARAMS=luicode%3D10000011%26lfid%3D1076032050142347%26fid%3D1005052050142347%26uicode%3D10000011'
         cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
 
+        # 获取users_id.txt文件的相对路径
+        current_dir = os.path.dirname(__file__)  # 获取当前文件的目录
+        file_path = os.path.join(current_dir, '..', '..', 'users_id.txt')  # 构建 user_id.txt 文件的相对路径
+        file_path = os.path.abspath(file_path)  # 规范化路径
+
         # 从文件中读取user_id
-        file = 'user_id.txt'
-        with open(file, 'r') as file:
+        with open(file_path, 'r') as file:
             user_ids = file.readlines()
 
         # 逐行读取微博用户ID
@@ -113,6 +121,7 @@ class WeiboSearchSpider(RedisSpider):
                         if start_date <= created_at <= end_date:
                             item = self.crawl_parse(micro_card, item, created_at_str)  #引入crawl_parse函数，更新item。
 
+                            # 如果微博太长未显示完整，则进入全文页爬取全文。请注意，这里爬取被转发微博的全文，因为用途不大。
                             if f'''<a href="/status/{item['id']}">全文</a>''' in item['text']:
                                 yield scrapy.Request(self.status_url.format(id=item['id']),
                                                      callback=self.parse_status,
@@ -134,11 +143,9 @@ class WeiboSearchSpider(RedisSpider):
 
                     # 解析微博发布时间
                     created_at_str = card['mblog']['created_at']
-                    #print(f"第{scroll_count}次滚动的since_id为{since_id}，user_id为{user_id}，微博发布时间为{created_at_str}。")
                     try:
                         created_at = datetime.strptime(created_at_str, '%a %b %d %H:%M:%S %z %Y')
                     except ValueError:
-                        #print('那就跳过了')
                         continue  # 如果解析失败，跳过该微博
 
                     # 检查发布时间是否在指定范围内
@@ -165,7 +172,7 @@ class WeiboSearchSpider(RedisSpider):
 
             # 增加下滚次数
             n = statuses_count // 10 - scroll_count
-            custom_logger.info(f"{user_name}({user_id}) 共发表{statuses_count}条微博，本页抓取{count}个符合要求的item。已下滚{scroll_count}页，总共已抓取{self.user_item_count[user_id]}个。还可滚动{n}次，下一页id为{since_id}。")
+            custom_logger.info(f"{user_name}({user_id}) 共发表{statuses_count}条微博，已下滚{scroll_count}页。本页抓取{count}个符合要求的item，总共已抓取{self.user_item_count[user_id]}个。还可滚动{n}次，下一页id为{since_id}。")
 
             scroll_count += 1
             if since_id:
@@ -178,19 +185,21 @@ class WeiboSearchSpider(RedisSpider):
         item.update({
             'crawl_time': datetime.now(),
             'created_at': created_at_str,
-            'id': card['mblog']['id'],
-            'text': card['mblog']['text'],
+            'id': card['mblog'].get('id'),
+            'text': card['mblog'].get('text'),
             'source': card['mblog'].get('source', ''),
-            'reposts_count': card['mblog']['reposts_count'],
-            'comments_count': card['mblog']['comments_count'],
-            'reprint_cmt_count': card['mblog']['reprint_cmt_count'],
-            'attitudes_count': card['mblog']['attitudes_count'],
-            'user_name': card['mblog']['user']['screen_name'],
-            'user_description': card['mblog']['user']['description'],
-            'user_follow_count': card['mblog']['user']['follow_count'],
-            'user_followers_count': card['mblog']['user']['followers_count'],
-            'user_statuses_count': card['mblog']['user']['statuses_count'],
-            'user_verified': card['mblog']['user']['verified'],
+            'reposts_count': card['mblog'].get('reposts_count', 0),
+            'comments_count': card['mblog'].get('comments_count', 0),
+            'reprint_cmt_count': card['mblog'].get('reprint_cmt_count', 0),
+            'attitudes_count': card['mblog'].get('attitudes_count', 0),
+            'user_name': card['mblog']['user'].get('screen_name'),
+            'user_description': card['mblog']['user'].get('description', ''),
+            'user_follow_count': card['mblog']['user'].get('follow_count', 0),
+            'user_followers_count': card['mblog']['user'].get('followers_count', 0),
+            'user_statuses_count': card['mblog']['user'].get('statuses_count', 0),
+            'user_verified': card['mblog']['user'].get('verified', False),
+            'user_verified_reason': card.get('user', {}).get(
+                'verified_reason', ''),
         })
 
         retweeted_status = card['mblog'].get('retweeted_status', {})
@@ -220,7 +229,7 @@ class WeiboSearchSpider(RedisSpider):
 
         return item
 
-    # 显示全文
+    # 爬取长微博的全文
     def parse_status(self, response):
         response_data = response.json()
         item = response.meta['item']

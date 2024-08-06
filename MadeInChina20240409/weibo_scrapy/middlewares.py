@@ -12,22 +12,25 @@ from .settings import USER_AGENT_LIST
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
 
+# 随机请求头中间件
 class RandomUserAgent(object):
 
     def process_request(self,request,spider):
         ua = random.choice(USER_AGENT_LIST)
         request.headers['User-Agent'] = ua
 
+# ip代理中间件，代理ip接入在这里设置
 class ProxyDownloaderMiddleware:
 
     def process_request(self, request, spider):
-        request.meta['proxy'] = "http://dyn.horocn.com:50000"  #来自于蜻蜓代理www.horocn.com。
+        request.meta['proxy'] = "http://dyn.horocn.com:50000"  # 来自于蜻蜓代理https://proxy.horocn.com/，手机号登录
         # 用户名密码认证
-        proxy_user_pass = "IYU61805944163629738:CByVqCCsygl7"  #2022/4/13 16:40过期。
+        proxy_user_pass = "IYU61805944163629738:CByVqCCsygl7"  # "订单号:密码"
         encoded_user_pass = base64.b64encode(proxy_user_pass.encode('utf-8'))
         request.headers['Proxy-Authorization'] = 'Basic ' + str(encoded_user_pass,encoding='utf-8')  # 白名单认证可注释此行
         request.headers["Connection"] = "close"
 
+# scrapy爬取所需中间件，不要动
 class WeiboScrapySpiderMiddleware:
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the spider middleware does not modify the

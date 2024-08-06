@@ -5,19 +5,12 @@
 
 import scrapy
 
-
 class WeiboScrapyItem(scrapy.Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
-    crawl_time = scrapy.Field()
+    # 用户所发微博
     since_id = scrapy.Field()
-    user_id = scrapy.Field()
-    user_name = scrapy.Field()
-    user_description = scrapy.Field()
-    user_follow_count = scrapy.Field()
-    user_followers_count = scrapy.Field()
-    user_statuses_count = scrapy.Field()
-    user_verified = scrapy.Field()
+    crawl_time = scrapy.Field()
     created_at = scrapy.Field()
     id = scrapy.Field()
     text = scrapy.Field()
@@ -26,8 +19,15 @@ class WeiboScrapyItem(scrapy.Item):
     comments_count = scrapy.Field()
     reprint_cmt_count = scrapy.Field()
     attitudes_count = scrapy.Field()
+    user_id = scrapy.Field()
+    user_name = scrapy.Field()
+    user_description = scrapy.Field()
+    user_follow_count = scrapy.Field()
+    user_followers_count = scrapy.Field()
+    user_statuses_count = scrapy.Field()
+    user_verified = scrapy.Field()
     user_verified_reason = scrapy.Field()
-    # 转发相关
+    # 被转发微博
     retweet = scrapy.Field()  # 是否转发
     retweet_text = scrapy.Field()  # 转发微博内容
     retweet_created_at = scrapy.Field()  # 创建时间
