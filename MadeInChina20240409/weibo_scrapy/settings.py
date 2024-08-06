@@ -22,7 +22,7 @@ NEWSPIDER_MODULE = 'weibo_scrapy.spiders'
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 5 #允许发起的最大并发数量，默认为16，如果启用蜻蜓ip隧道代理，则设置为5，因为隧道代理最大并发数为5
+CONCURRENT_REQUESTS = 16 #允许发起的最大并发数量，默认为16，如果启用蜻蜓ip隧道代理，则设置为5，因为隧道代理最大并发数为5
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
@@ -117,7 +117,7 @@ SCHEDULER_PERSIST = True
 SCHEDULER_QUEUE_CLASS = 'scrapy_redis.queue.SpiderPriorityQueue'
 
 # 配置重爬，每次启动时都会清空redis，方便调试，调试一定要关掉，否则不能断点续爬
-# SCHEDULER_FLUSH_ON_START = True
+#SCHEDULER_FLUSH_ON_START = True
 
 # Redis 数据库的连接配置
 REDIS_HOST = '139.186.165.94'
@@ -126,8 +126,6 @@ REDIS_PARAMS = {
     'password': '',
 }
 REDIS_DB = 0  # 数据库号
-
-DUPEFILTER_DEBUG = True
 
 # # 可选：将抓取到的数据存储到 Redis 中
 # ITEM_PIPELINES = {
@@ -139,6 +137,7 @@ DUPEFILTER_DEBUG = True
 
 # 是否清理已完成任务
 CLOSESPIDER_TIMEOUT = 3600  # 一小时后清理
+
 
 # --------记录日志构造--------
 
@@ -153,7 +152,7 @@ log_file_path = 'log/weibo_search_{}_{}_{}_{}{}{}.log'.format(to_day.year, to_da
 # Scrapy 的默认日志配置
 LOG_ENABLED = True
 LOG_LEVEL = 'DEBUG'
-#LOG_FILE = log_file_path
+LOG_FILE = log_file_path
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
 LOG_DATEFORMAT = '%Y-%m-%d %H:%M:%S'
 

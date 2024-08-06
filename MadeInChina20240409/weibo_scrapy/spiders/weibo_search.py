@@ -1,21 +1,14 @@
 import scrapy
 import re
-import os
 import logging
 from datetime import datetime, timezone
 from weibo_scrapy.items import WeiboScrapyItem
-import redis
 from scrapy_redis.spiders import RedisSpider
-import hashlib
-from scrapy.utils.reqser import request_to_dict
-from scrapy.utils.request import request_fingerprint
-from scrapy.http import Request
 
 # 事实证明在断点续爬的时候只要redis的weibo_search:request里有网址，则会继续爬，没有网址，或者是只有爬完就结束的网址，则不会继续爬。
 # 因此实现断点续爬的关键点就是如何确保其request里一直有网址，没有网址的原因是URL处理速度快于URL的生成速度，导致Redis队列中的URL被迅速处理完，从而无法维持持续的抓取。
 # 研究了一晚上，断点续爬没有更好的方式了，主要是不能确保weibo_search:request里一定会有可以延伸的网址，目前只能是这个样子了。
-# 要解决此问题主要有两种方式：确保有足够的初始URL、并发请求数减少（settings.py中设置），本来想动态生态url再手工推送到requests列，但细想不行，因此本来产生的url就全部都要推送过去，手工推动只是白用工。
-
+# 要解决此问题主要有两种方式：确保有足够的初始URL、并发请求数减少（settings.py中设置），本来想动态生态url再手工推送到requests列，但细想+试验证明并不行，因此本来产生的url就全部都要推送过去，手工推送只是白用工。
 
 # 获取自定义日志记录器
 custom_logger = logging.getLogger('custom_logger')  #已在setting.py中设置好
@@ -34,11 +27,9 @@ end_date = datetime(2024, 7, 31, tzinfo=timezone.utc)
 class WeiboSearchSpider(RedisSpider):
     name = 'weibo_search'
     # allowed_domains = ['m.weibo.cn']  # 利用redis进行分布式爬虫需注销掉这个
+    redis_key = 'weibo_search:start_urls' # 用Redis进行分布式爬虫时用于存储初始URL的 Redis key
 
-    # 用Redis进行分布式爬虫时用于存储初始URL的 Redis key
-    redis_key = 'weibo_search:start_urls'
-
-    # 以下为全局抓取中要用到的url，这里先定义了，主要是为了redis，不然不会被注入redis中。
+    # 以下为全局抓取中要用到的url，这里先定义了，方便在一个地方统一管理要用到的网址。
     url = 'https://m.weibo.cn/api/container/getIndex?containerid=230413{user_id}_-_WEIBO_SECOND_PROFILE_WEIBO'
     new_url = "https://m.weibo.cn/api/container/getIndex?containerid=230413{user_id}_-_WEIBO_SECOND_PROFILE_WEIBO&page_type=03&since_id={since_id}"
     status_url = "https://m.weibo.cn/statuses/extend?id={id}"
@@ -52,41 +43,14 @@ class WeiboSearchSpider(RedisSpider):
 
         self.headers = {
             'Accept': 'application/json, text/plain, */*',
-            #'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
             'Referer': 'https://m.weibo.cn/',
             'Accept-Language': 'zh-CN,zh;q=0.9',
-            'x-xsrf-token':'888ee4',   #观察要爬取的网址“https://m.weibo.cn/profile/info?uid=2050142347”的请求头，发现多了这个参数。那这个参数的值是从哪里来的呢？还要研究一下
+            'x-xsrf-token':'9d791e',   #观察要爬取的网址“https://m.weibo.cn/profile/info?uid=2050142347”的请求头，发现多了这个参数。那这个参数的值是从哪里来的呢？还要研究一下
            }
 
         # cookies时不时会变，上面的x-xsrf-token时不时也会变，一定要注意观察待爬取网址的请求头，做相应的修改。
-        temp = '_T_WM=2a49f655949fe128a72e77d0c7660284; SCF=An88pjtFAEn9F8u7w53WMXvci1cCd8e6v5TeBL0pj8Sd2fbwpbIhzsSJc3W2b3cq4oS9GXXTNMzIqsZCniJ62ik.; SUB=_2A25Lo-RuDeRhGeNP6VMU8SjEwjSIHXVowXmmrDV6PUJbktAbLWunkW1NTr09mBSJmfd5HmmXxU1czGYJXgMXIqDR; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhKlxWT8Vs0ffppg0hdSMBY5NHD95QfeKzpSK2c1h.RWs4Dqcjsds_09sir; ALF=1724850494; MLOGIN=1; WEIBOCN_FROM=1110006030; XSRF-TOKEN=888ee4; mweibo_short_token=230e6de4d7; M_WEIBOCN_PARAMS=luicode%3D10000011%26lfid%3D1076032050142347%26fid%3D1005052050142347%26uicode%3D10000011'
+        temp = '_T_WM=2a49f655949fe128a72e77d0c7660284; ALF=1725462747; SCF=An88pjtFAEn9F8u7w53WMXvci1cCd8e6v5TeBL0pj8SdyGg3hz-97aumDxPtglPhGyHMKt_cfdEM9Q0r-lqjM4w.; SUB=_2A25LtJuLDeRhGeNP6VMU8SjEwjSIHXVoy5FDrDV6PUJbktAGLWvHkW1NTr09mF_33IpP3AoNkWC1oBIu1-AOnT3U; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhKlxWT8Vs0ffppg0hdSMBY5JpX5K-hUgL.Fo-peo2feKqR1Kn2dJLoI79jINS.qJMt; WEIBOCN_FROM=1110006030; XSRF-TOKEN=9d791e; MLOGIN=1; M_WEIBOCN_PARAMS=luicode%3D10000011%26lfid%3D231583%26fid%3D1005052050142347%26uicode%3D10000011; mweibo_short_token=93dc2207e0'
         self.cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
-
-        # 连接Redis
-        self.redis_conn = redis.StrictRedis(host='139.186.165.94', port=10001, db=0)
-
-        # 连接并Redis，并检查其requests队列是否为空，如果为空则推送新的url。
-        if self.redis_conn.llen(self.redis_key) == 0:
-            # 循环接收用户输入，直到找到在redis库中未被处理过的网址
-            while True:
-                user_input1 = input("请输入要继续爬取的user_id：")
-                user_input2 = input("请输入要继续爬取的since_id：")
-
-                continue_url = self.new_url.format(user_id=user_input1, since_id=user_input2)
-
-                # 生成指纹
-                request = Request(continue_url)
-                fp = request_fingerprint(request)
-
-                # 检查此网址是否已经在 Redis 库里被处理过
-                if self.redis_conn.sismember('weibo_search:dupefilter', fp):
-                    print("此网址已经被处理过，请重新输入。")
-                else:
-                    self.redis_conn.lpush(self.redis_key, continue_url)
-                    print(f"你输入的是：{continue_url}，已被注入redis库。")
-                    break
-
-
 
     # 重写make_requests_from_url方法，加入自定义的headers和cookies
     def make_requests_from_url(self, url):
@@ -94,56 +58,25 @@ class WeiboSearchSpider(RedisSpider):
 
     #用户信息页提取
     def parse(self, response):
+
+        # 用于检查是否连接成功，测试用，如果cookies过期，则这里会显示出来
+        # custom_logger.info(f"响应网址: {response.url}")
+        # custom_logger.info(f"响应状态码: {response.status}")
+        # custom_logger.info(f"响应的内容：{response.text}")
+
         response_data = response.json()
-        #response.url
-        print(f'{response.url}')
-
-        if "containerid=230413" in response.url and "_-_WEIBO_SECOND_PROFILE_WEIBO" in response.url:
-            pattern = r"containerid=230413(\d+)_-_WEIBO_SECOND_PROFILE_WEIBO"
-            match = re.search(pattern, response.url)
-            user_id = match.group(1)
-            user_name = response_data.get('data').get('cards')[0].get('mblog').get('user').get('screen_name')
-            statuses_count = response_data.get('data').get('cards')[0].get('mblog').get('user').get('statuses_count')
-            # 检查变量 scroll_count 是否存在
-            if 'scroll_count' not in locals():
-                print(f"名字为{user_name},id为{user_id}，微博总数为{statuses_count}")
-                user_input = input("请输入已滚动次数（整数）：")
-                scroll_count = user_input
-                a = self.item_crawl(response, response_data, user_id, user_name, statuses_count, scroll_count)
-                print('a')
-
-
-
-            # yield scrapy.Request(url=self.url.format(user_id=user_id), callback=self.weibo_parse,
-            #                      meta={'user_id': user_id, 'user_name': user_name, 'statuses_count': statuses_count,
-            #                            'cookiejar': response.meta.get('cookiejar'),
-            #                            'headers': response.meta.get('headers'),
-            #                            'scroll_count': 0})  # 'scroll_count': 0为设置滚动次数为0
-
-
-
-        elif "type=uid&value=" in response.url and "containerid=100505" in response.url:
+        user_name = response_data.get('data', {}).get('userInfo', {}).get('screen_name', None)  # 获取用户名
+        statuses_count = response_data.get('data', {}).get('userInfo', {}).get('statuses_count', None)  # 获取发微博数量
+        if "type=uid&value=" in response.url and "containerid=100505" in response.url:
             pattern = r"value=(\d+)&containerid"
             match = re.search(pattern, response.url)
             user_id = match.group(1)
-            user_name = response_data.get('data', {}).get('userInfo', {}).get('screen_name', None)  # 获取用户名
-            statuses_count = response_data.get('data', {}).get('userInfo', {}).get('statuses_count', None)  # 获取发微博数量
             yield scrapy.Request(url=self.url.format(user_id=user_id), callback=self.weibo_parse,
                                  meta={'user_id': user_id, 'user_name': user_name, 'statuses_count': statuses_count,
                                        'cookiejar': response.meta.get('cookiejar'),
                                        'headers': response.meta.get('headers'),
                                        'scroll_count': 0})  # 'scroll_count': 0为设置滚动次数为0
 
-        else:
-            custom_logger.info("user_id不存在")
-
-        # #user_id = response.meta['user_id']  # 继承user_id
-        # user_name = response_data.get('data',{}).get('userInfo',{}).get('screen_name',None) # 获取用户名
-        # statuses_count = response_data.get('data', {}).get('userInfo', {}).get('statuses_count',None) #获取发微博数量
-
-        # yield scrapy.Request(url=self.url.format(user_id=user_id), callback=self.weibo_parse,
-        #                      meta={'user_id': user_id, 'user_name': user_name,'statuses_count': statuses_count, 'cookiejar': response.meta.get('cookiejar'),
-        #                                                        'headers': response.meta.get('headers'),'scroll_count': 0})  # 'scroll_count': 0为设置滚动次数为0
     # 全部发表微博的滚动提取
     def weibo_parse(self, response):
 
@@ -152,12 +85,6 @@ class WeiboSearchSpider(RedisSpider):
         user_name = response.meta['user_name']
         statuses_count = response.meta['statuses_count']
         scroll_count = response.meta['scroll_count']  # 获取下滚次数
-
-        self.item_crawl(response, response_data, user_id, user_name, statuses_count, scroll_count)
-
-    def item_crawl(self,response, response_data, user_id, user_name, statuses_count, scroll_count):
-
-        print("进入item_crawl函数")
 
         if response_data.get('ok') == 1:
             since_id = response_data.get('data', {}).get('cardlistInfo', {}).get('since_id', "未获取到下一页的since_id")  # 获取下一页的since_id。
@@ -240,13 +167,9 @@ class WeiboSearchSpider(RedisSpider):
 
             scroll_count += 1
             if since_id:
-                new_url = self.new_url.format(user_id=user_id, since_id=since_id)
-                yield scrapy.Request(new_url, callback=self.weibo_parse,
+                yield scrapy.Request(self.new_url.format(user_id=user_id, since_id=since_id), callback=self.weibo_parse,
                                      meta={'cookiejar': response.meta['cookiejar'],
                                            'headers': response.meta['headers'], 'scroll_count': scroll_count, 'user_id': user_id, 'user_name':user_name, 'statuses_count': statuses_count})
-            else:
-                custom_logger.info(f"{user_name}({user_id}) 共发表{statuses_count}条微博，现已经没有since_id，已经爬至最后一页。总共下滚{scroll_count}次，抓取到{count}个符合要求的item。")
-        return "dedgdsdg"
 
     # 微博内容提取函数
     def crawl_parse(self, card, item, created_at_str):
@@ -323,5 +246,4 @@ class WeiboSearchSpider(RedisSpider):
         if response_data.get('ok') == 1:
             item['text'] = response_data.get('data',{}).get('longTextContent',{})
         yield item
-
 
