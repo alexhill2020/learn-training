@@ -22,7 +22,7 @@ NEWSPIDER_MODULE = 'weibo_scrapy.spiders'
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 16 #允许发起的最大并发数量，默认为16，如果启用蜻蜓ip隧道代理，则设置为5，因为隧道代理最大并发数为5
+CONCURRENT_REQUESTS = 32 #允许发起的最大并发数量，默认为16，如果启用蜻蜓ip隧道代理，则设置为5，因为隧道代理最大并发数为5
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay

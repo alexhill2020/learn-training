@@ -13,7 +13,7 @@ redis_conn = redis.StrictRedis(host='139.186.165.94', port=10001, db=0)
 redis_key = 'weibo_search:start_urls'
 
 # 基础 URL 模板
-url_template = 'https://m.weibo.cn/api/container/getIndex?type=uid&value={user_id}&containerid=100505{user_id}'
+url_template = 'https://m.weibo.cn/api/container/getIndex?containerid=230413{user_id}_-_WEIBO_SECOND_PROFILE_WEIBO'
 
 # 获取users_id.txt文件的相对路径
 current_dir = os.path.dirname(__file__)  # 获取当前文件的目录
@@ -38,5 +38,7 @@ for user_id in user_ids:
     n += 1
 
 print(f"成功推送 {n} 条URL至Redis。")
+
+
 
 
