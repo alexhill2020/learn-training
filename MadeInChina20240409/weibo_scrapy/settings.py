@@ -136,7 +136,7 @@ REDIS_DB = 0  # 数据库号
 # REDIS_ITEMS_KEY = 'scrapy:items'
 
 # 是否清理已完成任务
-CLOSESPIDER_TIMEOUT = 3600  # 一小时后清理
+# CLOSESPIDER_TIMEOUT = 3600  # 一小时后清理
 
 
 # --------记录日志构造--------

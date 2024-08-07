@@ -194,9 +194,10 @@ class WeiboSearchSpider(RedisSpider):
                 'verified_reason', ''),
         })
 
-        retweeted_status = card['mblog'].get('retweeted_status', {})
+        retweeted_status = card['mblog'].get('retweeted_status', {})  # 获取 retweeted_status，如果不存在则使用空字典
         # 确保retweeted_status存在时才去获取值，否则直接设为默认值
         if retweeted_status:
+            user_info = retweeted_status.get('user') or {}  # 获取 user 信息，如果 user 不存在或为 None，则使用空字典
             item.update({
                 'retweet': 1,
                 'retweet_text': retweeted_status.get('text', ''),
@@ -207,14 +208,14 @@ class WeiboSearchSpider(RedisSpider):
                 'retweet_comments_count': retweeted_status.get('comments_count', 0),
                 'retweet_reprint_cmt_count': retweeted_status.get('reprint_cmt_count', 0),
                 'retweet_attitudes_count': retweeted_status.get('attitudes_count', 0),
-                'retweet_user_name': retweeted_status.get('user', {}).get('screen_name', ''),
-                'retweet_user_id': retweeted_status.get('user', {}).get('id', ''),
-                'retweet_user_description': retweeted_status.get('user', {}).get('description', ''),
-                'retweet_user_follow_count': retweeted_status.get('user', {}).get('follow_count', 0),
-                'retweet_user_followers_count': retweeted_status.get('user', {}).get('followers_count', 0),
-                'retweet_user_statuses_count': retweeted_status.get('user', {}).get('statuses_count', 0),
-                'retweet_user_verified': retweeted_status.get('user', {}).get('verified', False),
-                'retweet_user_verified_reason': retweeted_status.get('user', {}).get('verified_reason', ''),
+                'retweet_user_name': user_info.get('user', {}).get('screen_name', ''),
+                'retweet_user_id': user_info.get('user', {}).get('id', ''),
+                'retweet_user_description': user_info.get('user', {}).get('description', ''),
+                'retweet_user_follow_count': user_info.get('user', {}).get('follow_count', 0),
+                'retweet_user_followers_count': user_info.get('user', {}).get('followers_count', 0),
+                'retweet_user_statuses_count': user_info.get('user', {}).get('statuses_count', 0),
+                'retweet_user_verified': user_info.get('user', {}).get('verified', False),
+                'retweet_user_verified_reason': user_info.get('user', {}).get('verified_reason', ''),
             })
         else:
             item.update({
