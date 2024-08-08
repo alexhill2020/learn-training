@@ -102,8 +102,23 @@ ITEM_PIPELINES = {
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
-# Scrapy会在遇到这些状态码时自动重试请求
-RETRY_HTTP_CODES = [401, 403, 408, 414, 500, 502, 503, 504]
+# Scrapy会在遇到这些状态码时自动重试请求，并按以下要求增加重试次数和等待时间
+RETRY_HTTP_CODES = [401, 403, 408, 414, 429, 500, 502, 503, 504, 522, 524]  # 当 Scrapy 收到这些状态码时，将认为请求失败，并触发重试机制
+RETRY_TIMES = 5  # 最大重试次数（次），默认为2次
+RETRY_DELAY = 5  # 每次重试之间的延迟时间（秒），默认为0秒
+DOWNLOAD_TIMEOUT = 15 # 每个下载请求的最大等待时间（秒），默认为180秒
+
+# 401 - Unauthorized：未授权，表示请求需要身份验证。通常需要提供有效的身份验证凭证才能访问请求的资源。
+# 403 - Forbidden：禁止访问，表示服务器理解请求但拒绝执行。通常是因为权限问题，客户端没有访问资源的权限。
+# 408 - Request Timeout：请求超时，表示服务器在等待客户端发送的请求时超时。通常是因为网络问题或客户端响应缓慢。
+# 414 - URI Too Long：URI 太长，表示请求的 URI 过长，服务器无法处理。通常是因为 GET 请求的查询字符串过长。
+# 429 - Too Many Requests：请求过多，表示客户端发送了太多请求，服务器限制了请求速率。通常需要等待一段时间再重新发送请求。
+# 500 - Internal Server Error：服务器内部错误，表示服务器遇到意外情况而无法完成请求。通常是服务器端的问题，需要服务器管理员检查日志。
+# 502 - Bad Gateway：错误网关，表示服务器作为网关或代理时收到无效响应。通常是上游服务器的问题。
+# 503 - Service Unavailable：服务不可用，表示服务器当前无法处理请求。通常是因为服务器过载或正在进行维护。
+# 504 - Gateway Timeout：网关超时，表示服务器作为网关或代理时未能及时从上游服务器收到响应。通常是上游服务器的问题。
+# 522 - Connection Timed Out：连接超时，表示 Cloudflare 等代理服务器未能及时从上游服务器收到响应。通常是上游服务器的问题或网络问题。
+# 524 - A Timeout Occurred：超时错误，表示 Cloudflare 等代理服务器等待上游服务器响应超时。通常是上游服务器响应缓慢或无法访问。
 
 # --------使用 scrapy-redis 进行分布式爬虫所要设置的项--------
 # 使用 scrapy-redis 的调度器和去重类
@@ -126,6 +141,7 @@ REDIS_PARAMS = {
     'password': '',
 }
 REDIS_DB = 0  # 数据库号
+redis_name = 'weibo_search' # 数据库中的项目名。自己设置的变量，非官方的，故小写。
 
 # # 可选：将抓取到的数据存储到 Redis 中
 # ITEM_PIPELINES = {
