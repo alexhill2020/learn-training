@@ -5,30 +5,33 @@
 
 
 # useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
 
-import pymongo  #这是连接MongoDb数据库的模块。
-from scrapy.utils.project import get_project_settings  #这是读取settings.py文件所需的模块。
+from pymongo import MongoClient
 from scrapy.exceptions import CloseSpider
 import logging
+from weibo_scrapy import settings
 
 # 获取自定义日志记录器
 custom_logger = logging.getLogger('custom_logger')
 
-settings = get_project_settings()  #读取settings.py文件的数据。
-
 class WeiboScrapyMongoPipeline:
 
     def __init__(self):
-        host = settings['MONGODB_SERVER']
-        port = settings['MONGODB_PORT']
-        dbname = 'weibo_search_20240805'  # 数据库名
-        sheetname = 'weibo_search_main_20240805'  #表名
+        host = settings.MONGODB_SERVER  # ip地址
+        port = settings.MONGODB_PORT  # 端口
+        username = settings.MONGODB_USER  # 用户名
+        password = settings.MONGODB_PWD  # 密码
+        audb = settings.MONGODB_AUDB  # 用于认证的数据库
+        dbname = settings.MONGODB_DBNAME  # 数据库名
+        sheetname = settings.MONGODB_SHEETNAME  #表名
 
-        client = pymongo.MongoClient(host=host, port=port)  #连接MongoDb数据库并实体化为client。
+        connection_string = f"mongodb://{username}:{password}@{host}:{port}/{audb}"  # 连接mongodb的地址字符串
 
-        mydb = client[dbname]  #创建数据库。
-        self.sheet = mydb[sheetname]  #在创建的数据库中创建表。
+        # 创建MongoDB客户端
+        self.client = MongoClient(connection_string)
+
+        self.mydb = self.client[dbname]  #连接数据库，如没有则创建。
+        self.sheet = self.mydb[sheetname]  #连接数据库中的表，如没有则创建。
 
     def process_item(self, item, spider):
         try:

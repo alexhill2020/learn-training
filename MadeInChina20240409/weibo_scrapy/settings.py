@@ -47,11 +47,29 @@ RANDOMIZE_DOWNLOAD_DELAY=True #随机下载延迟，避免反爬
 #    'Accept-Language': 'zh-CN,zh;q=0.9',
 # }
 
-#HTTPERROR_ALLOWED_CODES = [403]
+# --------自定义请求头headers和cookies，以在爬虫文件和其它地方使用--------
+headers = {
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://m.weibo.cn/',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'x-xsrf-token': '9d791e',
+        # 观察要爬取的网址“https://m.weibo.cn/profile/info?uid=2050142347”的请求头，发现多了这个参数。那这个参数的值是从哪里来的呢？还要研究一下
+}
+# cookies时不时会变，上面的x-xsrf-token时不时也会变，一定要注意观察待爬取网址的请求头，做相应的修改。
+temp = '_T_WM=2a49f655949fe128a72e77d0c7660284; ALF=1725462747; SCF=An88pjtFAEn9F8u7w53WMXvci1cCd8e6v5TeBL0pj8SdyGg3hz-97aumDxPtglPhGyHMKt_cfdEM9Q0r-lqjM4w.; SUB=_2A25LtJuLDeRhGeNP6VMU8SjEwjSIHXVoy5FDrDV6PUJbktAGLWvHkW1NTr09mF_33IpP3AoNkWC1oBIu1-AOnT3U; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhKlxWT8Vs0ffppg0hdSMBY5JpX5K-hUgL.Fo-peo2feKqR1Kn2dJLoI79jINS.qJMt; WEIBOCN_FROM=1110006030; XSRF-TOKEN=9d791e; MLOGIN=1; M_WEIBOCN_PARAMS=luicode%3D10000011%26lfid%3D231583%26fid%3D1005052050142347%26uicode%3D10000011; mweibo_short_token=93dc2207e0'
+cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
 
-#连接MongoDB数据库的配置。
-MONGODB_SERVER = "localhost"  #默认本地数据库IP。
+
+# HTTPERROR_ALLOWED_CODES = [403]
+
+# --------连接MongoDB数据库的配置--------
+MONGODB_SERVER = '139.186.165.94'  #MongoDB数据库所在云服务器IP。
 MONGODB_PORT = 27017  #默认端口。
+MONGODB_USER = 'admin'  # 用户名
+MONGODB_PWD = 'admin123'  # 密码
+MONGODB_AUDB = 'admin'  # 用于认证的数据库名称
+MONGODB_DBNAME = 'weibo_search_20240805'  # 数据库名
+MONGODB_SHEETNAME = 'weibo_search_main_20240805'  # 表名
 
 
 # Enable or disable spider middlewares
@@ -102,7 +120,7 @@ ITEM_PIPELINES = {
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
-# Scrapy会在遇到这些状态码时自动重试请求，并按以下要求增加重试次数和等待时间
+# --------Scrapy会在遇到这些状态码时自动重试请求，并按以下要求增加重试次数和等待时间---------
 RETRY_HTTP_CODES = [401, 403, 408, 414, 429, 500, 502, 503, 504, 522, 524]  # 当 Scrapy 收到这些状态码时，将认为请求失败，并触发重试机制
 RETRY_TIMES = 5  # 最大重试次数（次），默认为2次
 RETRY_DELAY = 5  # 每次重试之间的延迟时间（秒），默认为0秒
@@ -155,7 +173,7 @@ redis_name = 'weibo_search' # 数据库中的项目名。自己设置的变量�
 # CLOSESPIDER_TIMEOUT = 3600  # 一小时后清理
 
 
-# --------记录日志构造--------
+# --------自定义记录日志构造--------
 
 import datetime
 import logging

@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 from weibo_scrapy.items import WeiboScrapyItem
 from scrapy_redis.spiders import RedisSpider
 from redis.exceptions import ConnectionError, TimeoutError
-from .. import settings  # 从上级目录中导入setting.py文件
+from weibo_scrapy import settings
+
 
 # 事实证明在断点续爬的时候只要redis的weibo_search:request里有网址，则会继续爬，没有网址，或者是只有爬完就结束的网址，则不会继续爬。
 # 因此实现断点续爬的关键点就是如何确保其request里一直有网址，没有网址的原因是URL处理速度快于URL的生成速度，导致Redis队列中的URL被迅速处理完，从而无法维持持续的抓取。
@@ -20,10 +21,10 @@ from .. import settings  # 从上级目录中导入setting.py文件
 custom_logger = logging.getLogger('custom_logger')  #已在setting.py中设置好
 
 # 获取当前日期和时间
-time = datetime.now()
+current_time = datetime.now()
 
 # 打印当前日期和时间
-custom_logger.info(f"----------开始爬虫，当前时间是：{time}----------")
+custom_logger.info(f"----------开始爬虫，当前时间是：{current_time}----------")
 
 # 定义爬取微博的时间范围
 start_date = datetime(2017, 10, 18, tzinfo=timezone.utc)  #后面是添加时区信息
@@ -32,33 +33,32 @@ end_date = datetime(2024, 7, 31, tzinfo=timezone.utc)
 class WeiboSearchSpider(RedisSpider):
     name = 'weibo_search'
     # allowed_domains = ['m.weibo.cn']  # 利用redis进行分布式爬虫需注销掉这个
-    redis_key = 'weibo_search:start_urls' # 用Redis进行分布式爬虫时用于存储初始URL的 Redis key
+    redis_key = f'{name}start_urls' # 用Redis进行分布式爬虫时用于存储初始URL的 Redis key
 
     # 以下为全局抓取中要用到的url，这里先定义了，方便在一个地方统一管理要用到的网址。
     new_url = "https://m.weibo.cn/api/container/getIndex?containerid=230413{user_id}_-_WEIBO_SECOND_PROFILE_WEIBO&page_type=03&since_id={since_id}"
     status_url = "https://m.weibo.cn/statuses/extend?id={id}"
 
+    dupefilter_key = f"{name}:dupefilter"  # 已爬页面库
+    queue_key = f'{name}:requests'  # 请求队列库
+    since_key = f'{name}:since_id'  # since_id队列
+    item_key = f'{name}:itemcount'
+    scroll_key = f'{name}:scrollcount'
+
+
     # 项目初始化函数
     def __init__(self, *args, **kwargs):
         super(WeiboSearchSpider, self).__init__(*args, **kwargs)
 
-        # 初始化各微博用户（user_id）抓取item数量计数器
+         # 初始化各微博用户（user_id）抓取item数量计数器
         self.user_item_count = {}
 
         # 获取redis连接，调用了redis连接函数connect_to_redis()
         self.redis_conn = self.connect_to_redis()
 
-        # 自定义请求头
-        self.headers = {
-            'Accept': 'application/json, text/plain, */*',
-            'Referer': 'https://m.weibo.cn/',
-            'Accept-Language': 'zh-CN,zh;q=0.9',
-            'x-xsrf-token':'9d791e',   #观察要爬取的网址“https://m.weibo.cn/profile/info?uid=2050142347”的请求头，发现多了这个参数。那这个参数的值是从哪里来的呢？还要研究一下
-           }
-
-        # cookies时不时会变，上面的x-xsrf-token时不时也会变，一定要注意观察待爬取网址的请求头，做相应的修改。
-        temp = '_T_WM=2a49f655949fe128a72e77d0c7660284; ALF=1725462747; SCF=An88pjtFAEn9F8u7w53WMXvci1cCd8e6v5TeBL0pj8SdyGg3hz-97aumDxPtglPhGyHMKt_cfdEM9Q0r-lqjM4w.; SUB=_2A25LtJuLDeRhGeNP6VMU8SjEwjSIHXVoy5FDrDV6PUJbktAGLWvHkW1NTr09mF_33IpP3AoNkWC1oBIu1-AOnT3U; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhKlxWT8Vs0ffppg0hdSMBY5JpX5K-hUgL.Fo-peo2feKqR1Kn2dJLoI79jINS.qJMt; WEIBOCN_FROM=1110006030; XSRF-TOKEN=9d791e; MLOGIN=1; M_WEIBOCN_PARAMS=luicode%3D10000011%26lfid%3D231583%26fid%3D1005052050142347%26uicode%3D10000011; mweibo_short_token=93dc2207e0'
-        self.cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
+        # 最setting中设置的headers和cookies
+        self.headers = settings.headers
+        self.cookies = settings.cookies
 
     # redis连接函数
     def connect_to_redis(self):
@@ -71,7 +71,7 @@ class WeiboSearchSpider(RedisSpider):
                 redis_conn.ping()
                 return redis_conn
             except (ConnectionError, TimeoutError):
-                print("连接到 Redis 服务器失败，正在重试...")
+                custom_logger.info("连接到 Redis 服务器失败，正在重试...")
                 time.sleep(5)
 
     # 确保redis正常连接的函数
@@ -79,7 +79,7 @@ class WeiboSearchSpider(RedisSpider):
         try:
             self.redis_conn.ping()
         except (ConnectionError, TimeoutError):
-            print("Redis 连接丢失，正在重新连接...")
+            custom_logger.info("爬取时 Redis 连接丢失，正在重新连接...")
             self.redis_conn = self.connect_to_redis()
 
     # 重写make_requests_from_url方法，加入自定义的headers和cookies
@@ -103,20 +103,18 @@ class WeiboSearchSpider(RedisSpider):
         # 在每次操作 Redis 前确保连接有效，涉及两个操作，获取scroll_count和item_count
         self.ensure_redis_connection()
         # 1.检查redis里存储的的滚动次数
-        scroll_count_key = 'weibo_search:scrollcount'
-        if not self.redis_conn.exists(scroll_count_key):
-            self.redis_conn.hset(scroll_count_key, user_id, 0)
+        if not self.redis_conn.exists(self.scroll_key):
+            self.redis_conn.hset(self.scroll_key, user_id, 0)
             scroll_count = 0
         else:
-            scroll_count = int(self.redis_conn.hget(scroll_count_key, user_id) or 0)
+            scroll_count = int(self.redis_conn.hget(self.scroll_key, user_id) or 0)
 
         # 2.检查redis里存储的item抓取个数
-        item_count_key = 'weibo_search:itemcount'
-        if not self.redis_conn.exists(item_count_key):
-            self.redis_conn.hset(item_count_key, user_id, 0)
+        if not self.redis_conn.exists(self.item_key):
+            self.redis_conn.hset(self.item_key, user_id, 0)
             item_count = 0
         else:
-            item_count = int(self.redis_conn.hget(item_count_key, user_id) or 0)
+            item_count = int(self.redis_conn.hget(self.item_key, user_id) or 0)
 
         if response_data.get('ok') == 1:
             since_id = response_data.get('data', {}).get('cardlistInfo', {}).get('since_id', "无")  # 获取下一页的since_id。
@@ -125,10 +123,10 @@ class WeiboSearchSpider(RedisSpider):
 
             cards = response_data.get('data', {}).get('cards', [])  # 此时，cards是一个列表。
             count = 0  # 初始化每页面爬取微博数的计数器，符合要求即加1，否则不加。
+            item['since_id'] = since_id
+            item['user_id'] = user_id
             for card in cards:
 
-                item['since_id'] = since_id
-                item['user_id'] = user_id
                 if card.get('card_type') == 11 and card.get('show_type') == 3:  # 置顶微博模块，不是每个用户都有置顶微博，要注意。
                     for micro_card in card['card_group']:
 
@@ -201,23 +199,25 @@ class WeiboSearchSpider(RedisSpider):
                             item['user_statuses_count'], int) else int(
                             item['user_statuses_count'][0])  # 确保 user_statuses_count 是整数
 
-            # 增加下滚次数
-            n = item['user_statuses_count'] // 10 - scroll_count
-            custom_logger.info(f"{item['user_name']}({user_id}) 共发表{item['user_statuses_count']}条微博，已下滚{scroll_count}页。本页抓取{count}个符合要求的item，总共已抓取{item_count}个。还可滚动{n}次，下一页id为{since_id}。")
+            # 增加下滚次数，增加判断是到最后一页了就找不到statuses_count了。
+            if item.get('user_statuses_count') and item['user_statuses_count'] != 0:
+                n = item['user_statuses_count'] // 10 - scroll_count
+                custom_logger.info(f"{item['user_name']}({user_id}) 共发表{item['user_statuses_count']}条微博，已下滚{scroll_count}页。本页抓取{count}个符合要求的item，总共已抓取{item_count}个。还可滚动{n}次，下一页id为{since_id}。")
 
             # 在每次操作 Redis 前确保连接有效，以使存储数据更准确，接下来有三个数据需存储，分别为item_count、scroll_count、since_id。
             self.ensure_redis_connection()  # 在每次操作 Redis 前确保连接有效，以使存储数据更准确
 
             # 1.将这次总共爬取的 item 个数存入redis。
-            self.redis_conn.hset(item_count_key, user_id, item_count)  #存储item_count
+            self.redis_conn.hset(self.item_key, user_id, str(item_count))  #存储item_count
 
             # 检查 since_id 是否为默认值
-            if since_id == "无":   # 在这里处理未获取到 since_id 的情况
-                print(f"{item['user_name']}({user_id}) 未获取到下一页的since_id，此用户可能爬取结束，共滚动{scroll_count}次，共抓取{item_count}个item。")
+            if since_id == "无":   # 在这里处理未获取到 since_id 的情况，即基本到最后一页了。
+                user_url = f"https://weibo.com/u/{user_id}"
+                custom_logger.info(f"用户 {user_id}) 未获取到下一页的since_id，此用户可能爬取结束，或请求了错误页面，请检查一下。总共已滚动{scroll_count}次，共抓取{item_count}个item。检查网址为 {user_url} 。")
             else:
                 # 2.滚动次数+1，并将变动后的 scroll_count 存入Redis
                 scroll_count += 1
-                self.redis_conn.hset(scroll_count_key, user_id, scroll_count)  # 存储scroll_count
+                self.redis_conn.hset(self.scroll_key, user_id, str(scroll_count))  # 存储scroll_count
                 # 3.将 since_id 存入redis
                 since_id_key = 'weibo_search:since_id'
                 self.redis_conn.hset(since_id_key, f"{user_id}:{item['user_name']}", since_id)  # 存储since_id
