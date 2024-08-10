@@ -33,7 +33,7 @@ end_date = datetime(2024, 7, 31, tzinfo=timezone.utc)
 class WeiboSearchSpider(RedisSpider):
     name = 'weibo_search'
     # allowed_domains = ['m.weibo.cn']  # 利用redis进行分布式爬虫需注销掉这个
-    redis_key = f'{name}start_urls' # 用Redis进行分布式爬虫时用于存储初始URL的 Redis key
+    redis_key = f'{name}:start_urls' # 用Redis进行分布式爬虫时用于存储初始URL的 Redis key
 
     # 以下为全局抓取中要用到的url，这里先定义了，方便在一个地方统一管理要用到的网址。
     new_url = "https://m.weibo.cn/api/container/getIndex?containerid=230413{user_id}_-_WEIBO_SECOND_PROFILE_WEIBO&page_type=03&since_id={since_id}"
@@ -96,6 +96,13 @@ class WeiboSearchSpider(RedisSpider):
 
         response_data = response.json()
 
+   # -----------调试----------
+        # print(f"请求的地址为{response.url}。")
+        # print(response_data)
+    # --------调试结束--------
+
+
+    # ------------原代码--------------------
         pattern = r"containerid=230413(\d+)_-_WEIBO_SECOND_PROFILE_WEIBO"
         match = re.search(pattern, response.url)
         user_id = match.group(1)

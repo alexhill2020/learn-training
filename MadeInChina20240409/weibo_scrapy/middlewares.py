@@ -6,11 +6,9 @@
 from scrapy import signals
 import base64
 import random
-
 from .settings import USER_AGENT_LIST
 
 # useful for handling different item types with a single interface
-from itemadapter import is_item, ItemAdapter
 
 # 随机请求头中间件
 class RandomUserAgent(object):

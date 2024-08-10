@@ -43,6 +43,19 @@ while True:
         print("连接到 Redis 服务器失败，正在重试...")
         time.sleep(5)
 
+# ----------调试----------
+
+# user_id = '2050142347'
+# since_id = '4929583138217713'
+#
+#
+# url  = continue_url_template.format(user_id=user_id, since_id=since_id)
+#
+# redis_conn.lpush(redis_key, url)
+# print(f'推送 {url} 成功。')
+
+#----------调试结束----------
+
 # 获取users_id.txt文件的相对路径
 current_dir = os.path.dirname(__file__)  # 获取当前文件的目录
 file_path = os.path.join(current_dir, 'users_id.txt')  # 构建 user_id.txt 文件的相对路径

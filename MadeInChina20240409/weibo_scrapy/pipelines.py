@@ -3,7 +3,6 @@
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 
-
 # useful for handling different item types with a single interface
 
 from pymongo import MongoClient
@@ -40,6 +39,6 @@ class WeiboScrapyMongoPipeline:
             return item
         except Exception as e:
             #print('存入数据库时出错',e)
-            custom_logger.error(f"数据存储失败: {e}")
+            custom_logger.info(f"数据存储失败: {e}")
             spider.crawler.engine.close_spider(spider, reason="MongoDB 数据存储失败。")
             raise CloseSpider(reason="MongoDB 数据存储失败。")

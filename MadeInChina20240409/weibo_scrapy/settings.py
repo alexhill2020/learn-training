@@ -7,7 +7,9 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-# import datetime
+import datetime
+import logging
+from logging.handlers import RotatingFileHandler
 
 BOT_NAME = 'weibo_scrapy'
 
@@ -48,21 +50,23 @@ RANDOMIZE_DOWNLOAD_DELAY=True #随机下载延迟，避免反爬
 # }
 
 # --------自定义请求头headers和cookies，以在爬虫文件和其它地方使用--------
+
 headers = {
         'Accept': 'application/json, text/plain, */*',
         'Referer': 'https://m.weibo.cn/',
         'Accept-Language': 'zh-CN,zh;q=0.9',
-        'x-xsrf-token': '9d791e',
+        'x-xsrf-token': '72a77c',
         # 观察要爬取的网址“https://m.weibo.cn/profile/info?uid=2050142347”的请求头，发现多了这个参数。那这个参数的值是从哪里来的呢？还要研究一下
 }
 # cookies时不时会变，上面的x-xsrf-token时不时也会变，一定要注意观察待爬取网址的请求头，做相应的修改。
-temp = '_T_WM=2a49f655949fe128a72e77d0c7660284; ALF=1725462747; SCF=An88pjtFAEn9F8u7w53WMXvci1cCd8e6v5TeBL0pj8SdyGg3hz-97aumDxPtglPhGyHMKt_cfdEM9Q0r-lqjM4w.; SUB=_2A25LtJuLDeRhGeNP6VMU8SjEwjSIHXVoy5FDrDV6PUJbktAGLWvHkW1NTr09mF_33IpP3AoNkWC1oBIu1-AOnT3U; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhKlxWT8Vs0ffppg0hdSMBY5JpX5K-hUgL.Fo-peo2feKqR1Kn2dJLoI79jINS.qJMt; WEIBOCN_FROM=1110006030; XSRF-TOKEN=9d791e; MLOGIN=1; M_WEIBOCN_PARAMS=luicode%3D10000011%26lfid%3D231583%26fid%3D1005052050142347%26uicode%3D10000011; mweibo_short_token=93dc2207e0'
+temp = '_T_WM=2a49f655949fe128a72e77d0c7660284; ALF=1725462747; SCF=An88pjtFAEn9F8u7w53WMXvci1cCd8e6v5TeBL0pj8SdyGg3hz-97aumDxPtglPhGyHMKt_cfdEM9Q0r-lqjM4w.; SUB=_2A25LtJuLDeRhGeNP6VMU8SjEwjSIHXVoy5FDrDV6PUJbktAGLWvHkW1NTr09mF_33IpP3AoNkWC1oBIu1-AOnT3U; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhKlxWT8Vs0ffppg0hdSMBY5JpX5K-hUgL.Fo-peo2feKqR1Kn2dJLoI79jINS.qJMt; WEIBOCN_FROM=1110006030; MLOGIN=1; XSRF-TOKEN=72a77c; M_WEIBOCN_PARAMS=luicode%3D10000011%26lfid%3D231583%26fid%3D1005052050142347%26uicode%3D10000011; mweibo_short_token=e1cc7b53db'
 cookies = {data.split('=')[0]: data.split('=')[-1] for data in temp.split(';')}  # 通过此步骤将直接复制的cookie转换成字典。
 
 
 # HTTPERROR_ALLOWED_CODES = [403]
 
 # --------连接MongoDB数据库的配置--------
+
 MONGODB_SERVER = '139.186.165.94'  #MongoDB数据库所在云服务器IP。
 MONGODB_PORT = 27017  #默认端口。
 MONGODB_USER = 'admin'  # 用户名
@@ -121,10 +125,11 @@ ITEM_PIPELINES = {
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
 # --------Scrapy会在遇到这些状态码时自动重试请求，并按以下要求增加重试次数和等待时间---------
+
 RETRY_HTTP_CODES = [401, 403, 408, 414, 429, 500, 502, 503, 504, 522, 524]  # 当 Scrapy 收到这些状态码时，将认为请求失败，并触发重试机制
-RETRY_TIMES = 5  # 最大重试次数（次），默认为2次
-RETRY_DELAY = 5  # 每次重试之间的延迟时间（秒），默认为0秒
-DOWNLOAD_TIMEOUT = 15 # 每个下载请求的最大等待时间（秒），默认为180秒
+RETRY_TIMES = 6  # 最大重试次数（次），默认为2次
+RETRY_DELAY = 15  # 每次重试之间的延迟时间（秒），默认为0秒
+DOWNLOAD_TIMEOUT = 180 # 每个下载请求的最大等待时间（秒），默认为180秒
 
 # 401 - Unauthorized：未授权，表示请求需要身份验证。通常需要提供有效的身份验证凭证才能访问请求的资源。
 # 403 - Forbidden：禁止访问，表示服务器理解请求但拒绝执行。通常是因为权限问题，客户端没有访问资源的权限。
@@ -139,6 +144,7 @@ DOWNLOAD_TIMEOUT = 15 # 每个下载请求的最大等待时间（秒），默�
 # 524 - A Timeout Occurred：超时错误，表示 Cloudflare 等代理服务器等待上游服务器响应超时。通常是上游服务器响应缓慢或无法访问。
 
 # --------使用 scrapy-redis 进行分布式爬虫所要设置的项--------
+
 # 使用 scrapy-redis 的调度器和去重类
 SCHEDULER = "scrapy_redis.scheduler.Scheduler"
 DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
@@ -169,15 +175,18 @@ redis_name = 'weibo_search' # 数据库中的项目名。自己设置的变量�
 # # 可选：配置 Redis 存储抓取数据的键
 # REDIS_ITEMS_KEY = 'scrapy:items'
 
-# 是否清理已完成任务
-# CLOSESPIDER_TIMEOUT = 3600  # 一小时后清理
+# 自动关闭爬虫时间
+# CLOSESPIDER_TIMEOUT = 3600  # 适用于需要对爬虫运行时间进行限制的场景。爬虫会在启动一定时间（如3600秒）后自动关闭爬虫，不管抓取任务是否完成。
 
+
+# --------自定义扩展件，见extensions.py--------
+
+# Scrapy 超过一定时间未抓取到 item 时则自动关闭
+EXTENSIONS = {
+    'weibo_scrapy.extensions.CloseSpiderAfterTimeout': 3600,  # 默认为600秒
+}
 
 # --------自定义记录日志构造--------
-
-import datetime
-import logging
-from logging.handlers import RotatingFileHandler
 
 # 获取当前日期时间
 to_day = datetime.datetime.now()
